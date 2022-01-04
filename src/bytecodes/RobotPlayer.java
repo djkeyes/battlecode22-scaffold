@@ -1029,7 +1029,7 @@ public final strictfp class RobotPlayer {
                 break;
         }
         after = Clock.getBytecodeNum();
-        expected = 42;
+        expected = 39;
         actual = after - before;
         assertEquals(expected, actual);
 
