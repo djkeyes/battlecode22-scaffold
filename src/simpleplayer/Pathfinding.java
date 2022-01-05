@@ -7,9 +7,7 @@ import battlecode.common.RobotController;
 
 import java.util.Random;
 
-import static simpleplayer.RobotPlayer.rc;
-import static simpleplayer.RobotPlayer.gen;
-import static simpleplayer.RobotPlayer.curLoc;
+import static simpleplayer.RobotPlayer.*;
 
 public class Pathfinding {
 
@@ -52,14 +50,14 @@ public class Pathfinding {
 
         if (inBugMode) {
             if ((turnsSinceBlocked >= PATIENCE)
-                    || ((numTurns <= 0 || numTurns >= 8) && curLoc.distanceSquaredTo(target) <= distSqToTargetAtBugModeStart)) {
+                    || ((numTurns <= 0 || numTurns >= 8) && locAtStartOfTurn.distanceSquaredTo(target) <= distSqToTargetAtBugModeStart)) {
                 inBugMode = false;
             }
         }
 
         if (!inBugMode) {
             Direction dirToMove = null;
-            Direction dirToTarget = curLoc.directionTo(target);
+            Direction dirToTarget = locAtStartOfTurn.directionTo(target);
 
             if (canMove(dirToTarget)) {
                 dirToMove = dirToTarget;
@@ -67,7 +65,7 @@ public class Pathfinding {
                 Direction[] dirs = new Direction[2];
                 Direction dirLeft = dirToTarget.rotateLeft();
                 Direction dirRight = dirToTarget.rotateRight();
-                if (curLoc.add(dirLeft).distanceSquaredTo(target) < curLoc.add(dirRight).distanceSquaredTo(target)) {
+                if (locAtStartOfTurn.add(dirLeft).distanceSquaredTo(target) < locAtStartOfTurn.add(dirRight).distanceSquaredTo(target)) {
                     dirs[0] = dirLeft;
                     dirs[1] = dirRight;
                 } else {
@@ -95,9 +93,9 @@ public class Pathfinding {
 
             boolean onMapEdge;
             if (isGoingLeft) {
-                onMapEdge = !rc.onTheMap(curLoc.add(lastMoveDir.rotateLeft()));
+                onMapEdge = !rc.onTheMap(locAtStartOfTurn.add(lastMoveDir.rotateLeft()));
             } else {
-                onMapEdge = !rc.onTheMap(curLoc.add(lastMoveDir.rotateRight()));
+                onMapEdge = !rc.onTheMap(locAtStartOfTurn.add(lastMoveDir.rotateRight()));
             }
             if (onMapEdge) {
                 isGoingLeft = !isGoingLeft;
@@ -197,8 +195,8 @@ public class Pathfinding {
         // bugWallSide = WallSide.LEFT;
         // }
 
-        distSqToTargetAtBugModeStart = curLoc.distanceSquaredTo(target);
-        dirAtStart = lastMoveDir = curLoc.directionTo(target);
+        distSqToTargetAtBugModeStart = locAtStartOfTurn.distanceSquaredTo(target);
+        dirAtStart = lastMoveDir = locAtStartOfTurn.directionTo(target);
         numTurns = 0;
         turnsSinceBlocked = 0;
 

@@ -14,14 +14,15 @@ public strictfp class RobotPlayer {
     public static Random gen;
     public static RobotType myType;
     // changes per-turn
-    public static MapLocation curLoc;
+    public static MapLocation locAtStartOfTurn;
     public static int robotCount;
     public static int archonCount;
     public static int ourLead;
     public static int ourGold;
+    public static MapLocation locAfterMovement; // anyone calling rc.move() MUST update this variable
 
     private static final Movement simpleMovement = new SimpleMovement();
-    private static final Movement rubbleAverseMovement = new RubbleAverseMovement();
+    private static final Movement rubbleAverseMovement = new RubbleAverseMovement(30);
 
     @SuppressWarnings("unused")
     public static void run(RobotController inputRobotController) {
@@ -38,7 +39,8 @@ public strictfp class RobotPlayer {
         while (true) {
             try {
                 while (true) {
-                    curLoc = rc.getLocation();
+                    locAtStartOfTurn = rc.getLocation();
+                    locAfterMovement = rc.getLocation();
                     robotCount = rc.getRobotCount();
                     archonCount = rc.getArchonCount();
                     ourLead = rc.getTeamLeadAmount(us);
@@ -76,7 +78,7 @@ public strictfp class RobotPlayer {
             return;
         }
 
-        if (robotCount < 10) {
+        if (robotCount - archonCount < 7) {
             // build workers
             if (RobotType.MINER.buildCostLead <= ourLead) {
                 for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
@@ -102,29 +104,37 @@ public strictfp class RobotPlayer {
 
     private static MapLocation lastTargetMiningLocation = null;
 
+    private static final int MIN_LEAD_AMOUNT = 2;
+
     private static void runMiner() throws GameActionException {
         MapLocation nearestVisibleLeadLocation = null;
+        MapLocation secondNearestVisibleLeadLocation = null;
+
+        // want to leave 1 lead afterwards
+
         // check for any visible lead
         // TODO: use spiral coordinates, so we can terminate early
         int closestRadiusSquared = Integer.MAX_VALUE;
+        int secondClosestRadiusSquared = Integer.MAX_VALUE;
         for (int x = 0; x * x <= myType.visionRadiusSquared; ++x) {
-            int startY = 0;
-            if (x == 0) {
-                startY = 1;
-            }
-            for (int y = startY; y * y + x * x <= myType.visionRadiusSquared; ++y) {
+            for (int y = 0; y * y + x * x <= myType.visionRadiusSquared; ++y) {
                 for (int sx = (x != 0 ? -1 : 1); sx <= 1; sx += 2) {
                     for (int sy = (y != 0 ? -1 : 1); sy <= 1; sy += 2) {
-                        MapLocation nextLoc = curLoc.translate(sx * x, sy * y);
+                        MapLocation nextLoc = locAtStartOfTurn.translate(sx * x, sy * y);
                         if (!rc.onTheMap(nextLoc)) {
                             continue;
                         }
                         int leadAmount = rc.senseLead(nextLoc);
-                        if (leadAmount >= 2) {
+                        if (leadAmount >= MIN_LEAD_AMOUNT) {
                             int rSquare = x * x + y * y;
                             if (rSquare < closestRadiusSquared) {
+                                secondClosestRadiusSquared = closestRadiusSquared;
+                                secondNearestVisibleLeadLocation = nearestVisibleLeadLocation;
                                 closestRadiusSquared = rSquare;
                                 nearestVisibleLeadLocation = nextLoc;
+                            } else if (rSquare == closestRadiusSquared) {
+                                secondClosestRadiusSquared = rSquare;
+                                secondNearestVisibleLeadLocation = nextLoc;
                             }
                         }
                     }
@@ -132,7 +142,7 @@ public strictfp class RobotPlayer {
             }
         }
 
-        if (lastTargetMiningLocation != null && curLoc.distanceSquaredTo(lastTargetMiningLocation) <= 2) {
+        if (lastTargetMiningLocation != null && locAtStartOfTurn.distanceSquaredTo(lastTargetMiningLocation) <= 2) {
             lastTargetMiningLocation = null;
         }
         if (nearestVisibleLeadLocation != null) {
@@ -143,16 +153,15 @@ public strictfp class RobotPlayer {
             lastTargetMiningLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
         }
 
-        if (closestRadiusSquared <= myType.actionRadiusSquared) {
-            // can mine now
-            if (rc.isActionReady()) {
-                //if (rc.canMineLead(lastTargetMiningLocation)) {
-                rc.mineLead(lastTargetMiningLocation);
-                //}
-            }
+        tryMiningAdjacentTiles();
 
-            lastTargetMiningLocation = null;
-            return;
+        // if we mined out, go somewhere new
+        if (lastTargetMiningLocation == null && secondNearestVisibleLeadLocation != null) {
+            lastTargetMiningLocation = secondNearestVisibleLeadLocation;
+        }
+        if (lastTargetMiningLocation == null) {
+            // pick somewhere at random and move towards it
+            lastTargetMiningLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
         }
 
         // okay to path away from target briefly, if we're bugging
@@ -162,27 +171,71 @@ public strictfp class RobotPlayer {
         } else {
             Pathfinding.setTarget(lastTargetMiningLocation, rubbleAverseMovement);
         }
-        if (Pathfinding.pathfindToward()) {
-            return;
-        }
+        Pathfinding.pathfindToward();
+
+        // maybe new mines opened up
+        tryMiningAdjacentTiles();
 
     }
 
-    private static MapLocation lastTargetAttackLocation = null;
+    private static void tryMiningAdjacentTiles() throws GameActionException {
+        MapLocation target = lastTargetMiningLocation;
+        boolean areWeAtTarget = lastTargetMiningLocation != null && locAfterMovement.distanceSquaredTo(target) <= myType.actionRadiusSquared;
+        if (!areWeAtTarget) {
+            // just check the nearby stuff. we're not at the destination yet.
+            target = locAfterMovement;
+        }
+        while (rc.isActionReady()) {
+            if (target == null) {
+                // need to pathfind somewhere new
+                if (areWeAtTarget) {
+                    lastTargetMiningLocation = null;
+                }
+                break;
+            }
+            int resourceLeft = rc.senseLead(target);
+            while (rc.isActionReady() && resourceLeft >= MIN_LEAD_AMOUNT) {
+                rc.mineLead(target);
+                resourceLeft -= 1;
+            }
+
+            if (resourceLeft < MIN_LEAD_AMOUNT) {
+                target = null;
+            } else {
+                // on action cooldown
+                break;
+            }
+
+            // see if anything adjacent to us still has resources
+            for (int dx = -1; dx <= 1; ++dx) {
+                for (int dy = -1; dy <= 1; ++dy) {
+                    MapLocation nextLoc = locAfterMovement.translate(dx, dy);
+                    if (!rc.onTheMap(nextLoc)) {
+                        continue;
+                    }
+                    int leadAmount = rc.senseLead(nextLoc);
+                    if (leadAmount >= MIN_LEAD_AMOUNT) {
+                        target = nextLoc;
+                        break;
+                    }
+                }
+                if (target != null) {
+                    break;
+                }
+            }
+
+        }
+    }
 
     private static void runSoldier() throws GameActionException {
-        if (lastTargetAttackLocation != null && curLoc.distanceSquaredTo(lastTargetAttackLocation) <= 2) {
-            lastTargetAttackLocation = null;
-        }
 
 
-        RobotInfo[] nearbyAllies = rc.senseNearbyRobots(curLoc, myType.visionRadiusSquared, us);
-        RobotInfo[] nearbyEnemies = rc.senseNearbyRobots(curLoc, myType.visionRadiusSquared, them);
+        RobotInfo[] nearbyAllies = rc.senseNearbyRobots(locAtStartOfTurn, myType.visionRadiusSquared, us);
+        RobotInfo[] nearbyEnemies = rc.senseNearbyRobots(locAtStartOfTurn, myType.visionRadiusSquared, them);
 
         // do micro if we're near enemies
         if (nearbyEnemies.length > 0) {
             doMicro(rc, nearbyAllies, nearbyEnemies);
-            lastTargetAttackLocation = null;
             return;
         }
 
@@ -192,6 +245,7 @@ public strictfp class RobotPlayer {
                 for (Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
                     if (rc.canMove(d)) {
                         rc.move(d);
+                        locAfterMovement = locAtStartOfTurn.add(d);
                         return;
                     }
                 }
@@ -199,14 +253,66 @@ public strictfp class RobotPlayer {
 
             // move randomly
             // TODO: deduce archon positions, and go there.
-            if (lastTargetAttackLocation == null) {
-                lastTargetAttackLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
-            }
-            Pathfinding.setTarget(lastTargetAttackLocation, rubbleAverseMovement);
-            if (Pathfinding.pathfindToward()) {
+
+            if (tryMoveToInitialEnemyArchonLocations()) {
                 return;
             }
+            tryMoveToRandomTarget();
+
         }
+    }
+
+    private static MapLocation myInitialLocation = null;
+    private static boolean[] checkedArchonLocation = null;
+    private static MapLocation lastArchonTarget = null;
+    private static int curSymmetryInvestigation = -1;
+
+    private static boolean tryMoveToInitialEnemyArchonLocations() throws GameActionException {
+        if (checkedArchonLocation == null) {
+            // For now, just store our initial position and try to path towards it
+            // TODO: broadcast initial archon data, so we can check all possible locations
+            checkedArchonLocation = new boolean[3];
+            for (int i = 0; i < 3; ++i) {
+                if (!MapSymmetry.isSymmetryPossible[i]) {
+                    checkedArchonLocation[i] = true;
+                }
+            }
+            myInitialLocation = locAtStartOfTurn;
+        }
+
+        if (lastArchonTarget != null && locAtStartOfTurn.distanceSquaredTo(lastArchonTarget) < myType.visionRadiusSquared) {
+            lastArchonTarget = null;
+        }
+
+        if (lastArchonTarget == null) {
+            for (int i = curSymmetryInvestigation + 1; i < 3; ++i) {
+                if (!checkedArchonLocation[i]) {
+                    lastArchonTarget = MapSymmetry.getSymmetricCoords(myInitialLocation, i);
+                    curSymmetryInvestigation = i;
+                    break;
+                }
+            }
+        }
+        if (lastArchonTarget == null) {
+            return false;
+        }
+        Pathfinding.setTarget(lastArchonTarget, rubbleAverseMovement);
+        Pathfinding.pathfindToward();
+        return true;
+    }
+
+    private static MapLocation lastTargetAttackLocation = null;
+
+    private static boolean tryMoveToRandomTarget() throws GameActionException {
+        if (lastTargetAttackLocation != null && locAtStartOfTurn.distanceSquaredTo(lastTargetAttackLocation) <= 2) {
+            lastTargetAttackLocation = null;
+        }
+        if (lastTargetAttackLocation == null) {
+            lastTargetAttackLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
+        }
+        Pathfinding.setTarget(lastTargetAttackLocation, rubbleAverseMovement);
+        Pathfinding.pathfindToward();
+        return true;
     }
 
     private static final CautiousMovement cautious = new CautiousMovement();
@@ -288,7 +394,7 @@ public strictfp class RobotPlayer {
                         // if we're on cooldown, we can still move
                         // for every unit
                         if (rc.isMovementReady()) {
-                            retreat(rc, nearbyEnemies, false);
+                            retreat(rc, nearbyEnemies);
                         }
                     }
                     return;
@@ -309,7 +415,7 @@ public strictfp class RobotPlayer {
             } else {
                 // retreat
                 if (rc.isMovementReady()) {
-                    retreat(rc, nearbyEnemies, false);
+                    retreat(rc, nearbyEnemies);
                 }
                 return;
             }
@@ -347,7 +453,7 @@ public strictfp class RobotPlayer {
         }
     }
 
-    private static boolean retreat(RobotController rc, RobotInfo[] nearbyEnemies, boolean clearRubbleAggressively)
+    private static boolean retreat(RobotController rc, RobotInfo[] nearbyEnemies)
             throws GameActionException {
         MapLocation curLoc = rc.getLocation();
         boolean[] isAwayFromEnemy = Directions.dirsAwayFrom(nearbyEnemies, curLoc);
@@ -375,9 +481,11 @@ public strictfp class RobotPlayer {
 
         if (dirToMove != null) {
             rc.move(dirToMove);
+            locAfterMovement = locAtStartOfTurn.add(dirToMove);
         } else if (unsafeDirToMove != null) {
             // better to move than stand still
             rc.move(unsafeDirToMove);
+            locAfterMovement = locAtStartOfTurn.add(unsafeDirToMove);
         }
 
         return true;

@@ -2,7 +2,7 @@ package simpleplayer;
 
 import battlecode.common.*;
 
-import static simpleplayer.RobotPlayer.rc;
+import static simpleplayer.RobotPlayer.*;
 
 public class CautiousMovement implements Movement {
     // movement strategy that avoids enemies
@@ -24,6 +24,7 @@ public class CautiousMovement implements Movement {
     @Override
     public void move(Direction dirToMove) throws GameActionException {
         rc.move(dirToMove);
+        locAfterMovement = locAtStartOfTurn.add(dirToMove);
     }
 
     @Override
