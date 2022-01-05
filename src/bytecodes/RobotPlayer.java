@@ -577,6 +577,10 @@ public final strictfp class RobotPlayer {
         }
     }
 
+    private static final class ClassWithStaticVar {
+        static int a;
+    }
+
     private static int staticVar;
 
     private static void staticMethod() {
@@ -684,6 +688,20 @@ public final strictfp class RobotPlayer {
 
         before = Clock.getBytecodeNum();
         finalWithMethods.finalNoop();
+        after = Clock.getBytecodeNum();
+        expected = 3;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        ClassWithStaticVar.a = 123;
+        after = Clock.getBytecodeNum();
+        expected = 3;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        AnotherClass.x = 789;
         after = Clock.getBytecodeNum();
         expected = 3;
         actual = after - before;
