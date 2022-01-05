@@ -7,6 +7,10 @@ import battlecode.common.RobotController;
 
 import java.util.Random;
 
+import static simpleplayer.RobotPlayer.rc;
+import static simpleplayer.RobotPlayer.gen;
+import static simpleplayer.RobotPlayer.curLoc;
+
 public class Pathfinding {
 
     // this is a little buggy (no pun intended) in some edge cases, so we
@@ -41,9 +45,8 @@ public class Pathfinding {
     }
 
     // precondition to this method: rc.isMovementReady() should return true
-    public static boolean pathfindToward(RobotController rc, Random gen) throws GameActionException {
-        MapLocation curLoc = rc.getLocation();
-        if (movementStrategy.atGoal(rc, target)) {
+    public static boolean pathfindToward() throws GameActionException {
+        if (movementStrategy.atGoal(target)) {
             return false;
         }
 
@@ -58,7 +61,7 @@ public class Pathfinding {
             Direction dirToMove = null;
             Direction dirToTarget = curLoc.directionTo(target);
 
-            if (canMove(rc, dirToTarget)) {
+            if (canMove(dirToTarget)) {
                 dirToMove = dirToTarget;
             } else {
                 Direction[] dirs = new Direction[2];
@@ -72,18 +75,18 @@ public class Pathfinding {
                     dirs[1] = dirLeft;
                 }
                 for (Direction dir : dirs) {
-                    if (canMove(rc, dir)) {
+                    if (canMove(dir)) {
                         dirToMove = dir;
                         break;
                     }
                 }
             }
             if (dirToMove != null) {
-                move(rc, dirToMove);
+                move(dirToMove);
                 return true;
             } else if (dirToMove == null) {
                 inBugMode = true;
-                resetBugMode(curLoc, gen);
+                resetBugMode();
             }
         }
 
@@ -98,7 +101,7 @@ public class Pathfinding {
             }
             if (onMapEdge) {
                 isGoingLeft = !isGoingLeft;
-                resetBugMode(curLoc, gen);
+                resetBugMode();
             }
 
             turnsSinceBlocked++;
@@ -107,12 +110,12 @@ public class Pathfinding {
 
             for (int i = 8; i-- > 0;) {
                 if (turnsSinceBlocked >= PATIENCE) {
-                    if (canMoveIfImpatient(rc, possibleDir)) {
+                    if (canMoveIfImpatient(possibleDir)) {
                         dir = possibleDir;
                         break;
                     }
                 } else {
-                    if (canMove(rc, possibleDir)) {
+                    if (canMove(possibleDir)) {
                         dir = possibleDir;
                         break;
                     }
@@ -127,7 +130,7 @@ public class Pathfinding {
             }
 
             if (dir != null) {
-                move(rc, dir);
+                move(dir);
                 numTurns += calculateBugRotation(dir);
                 lastMoveDir = dir;
                 if (isGoingLeft) {
@@ -142,8 +145,8 @@ public class Pathfinding {
         return false;
     }
 
-    private static void move(RobotController rc, Direction dirToMove) throws GameActionException {
-        movementStrategy.move(rc, dirToMove);
+    private static void move(Direction dirToMove) throws GameActionException {
+        movementStrategy.move(dirToMove);
     }
 
     private static int numRightRotations(Direction start, Direction end) {
@@ -162,15 +165,15 @@ public class Pathfinding {
         }
     }
 
-    private static boolean canMove(RobotController rc, Direction dir) throws GameActionException {
-        return movementStrategy.canMove(rc, dir);
+    private static boolean canMove(Direction dir) throws GameActionException {
+        return movementStrategy.canMove(dir);
     }
 
-    private static boolean canMoveIfImpatient(RobotController rc, Direction dir) {
-        return movementStrategy.canMoveIfImpatient(rc, dir);
+    private static boolean canMoveIfImpatient(Direction dir) {
+        return movementStrategy.canMoveIfImpatient(dir);
     }
 
-    public static void resetBugMode(MapLocation curLoc, Random gen) {
+    public static void resetBugMode() {
         // // try to intelligently choose on which side we will keep the
         // // wall
         // Direction leftTryDir = bugLastMoveDir.rotateLeft();

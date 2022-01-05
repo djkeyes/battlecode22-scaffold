@@ -6,31 +6,26 @@ import java.util.Random;
 
 public strictfp class RobotPlayer {
 
-    /**
-     * Array containing all the possible movement directions.
-     */
-    static final Direction[] directions = {
-            Direction.NORTH,
-            Direction.NORTHEAST,
-            Direction.EAST,
-            Direction.SOUTHEAST,
-            Direction.SOUTH,
-            Direction.SOUTHWEST,
-            Direction.WEST,
-            Direction.NORTHWEST,
-    };
-
-    private static int id;
-    private static Team us;
-    private static Team them;
-    private static Random gen;
-    private static RobotType myType;
+    public static RobotController rc;
+    // constant over lifetime of robot
+    public static int id;
+    public static Team us;
+    public static Team them;
+    public static Random gen;
+    public static RobotType myType;
+    // changes per-turn
+    public static MapLocation curLoc;
+    public static int robotCount;
+    public static int archonCount;
+    public static int ourLead;
+    public static int ourGold;
 
     private static final Movement simpleMovement = new SimpleMovement();
     private static final Movement rubbleAverseMovement = new RubbleAverseMovement();
 
     @SuppressWarnings("unused")
-    public static void run(RobotController rc) {
+    public static void run(RobotController inputRobotController) {
+        rc = inputRobotController;
         id = rc.getID();
         us = rc.getTeam();
         them = us.opponent();
@@ -43,15 +38,21 @@ public strictfp class RobotPlayer {
         while (true) {
             try {
                 while (true) {
+                    curLoc = rc.getLocation();
+                    robotCount = rc.getRobotCount();
+                    archonCount = rc.getArchonCount();
+                    ourLead = rc.getTeamLeadAmount(us);
+                    ourGold = rc.getTeamLeadAmount(us);
+
                     switch (myType) {
                         case ARCHON:
-                            runArchon(rc);
+                            runArchon();
                             break;
                         case MINER:
-                            runMiner(rc);
+                            runMiner();
                             break;
                         case SOLDIER:
-                            runSoldier(rc);
+                            runSoldier();
                             break;
                         case LABORATORY:
                         case WATCHTOWER:
@@ -69,9 +70,7 @@ public strictfp class RobotPlayer {
         }
     }
 
-    private static void runArchon(RobotController rc) throws GameActionException {
-        final int robotCount = rc.getRobotCount();
-        final int ourLead = rc.getTeamLeadAmount(us);
+    private static void runArchon() throws GameActionException {
 
         if (!rc.isActionReady()) {
             return;
@@ -103,9 +102,7 @@ public strictfp class RobotPlayer {
 
     private static MapLocation lastTargetMiningLocation = null;
 
-    private static void runMiner(RobotController rc) throws GameActionException {
-        MapLocation curLoc = rc.getLocation();
-
+    private static void runMiner() throws GameActionException {
         MapLocation nearestVisibleLeadLocation = null;
         // check for any visible lead
         // TODO: use spiral coordinates, so we can terminate early
@@ -165,7 +162,7 @@ public strictfp class RobotPlayer {
         } else {
             Pathfinding.setTarget(lastTargetMiningLocation, rubbleAverseMovement);
         }
-        if (Pathfinding.pathfindToward(rc, gen)) {
+        if (Pathfinding.pathfindToward()) {
             return;
         }
 
@@ -173,9 +170,7 @@ public strictfp class RobotPlayer {
 
     private static MapLocation lastTargetAttackLocation = null;
 
-    private static void runSoldier(RobotController rc) throws GameActionException {
-        MapLocation curLoc = rc.getLocation();
-
+    private static void runSoldier() throws GameActionException {
         if (lastTargetAttackLocation != null && curLoc.distanceSquaredTo(lastTargetAttackLocation) <= 2) {
             lastTargetAttackLocation = null;
         }
@@ -208,7 +203,7 @@ public strictfp class RobotPlayer {
                 lastTargetAttackLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
             }
             Pathfinding.setTarget(lastTargetAttackLocation, rubbleAverseMovement);
-            if (Pathfinding.pathfindToward(rc, gen)) {
+            if (Pathfinding.pathfindToward()) {
                 return;
             }
         }
@@ -306,7 +301,7 @@ public strictfp class RobotPlayer {
                         }
                         if (weakestLoc != null) {
                             Pathfinding.setTarget(weakestLoc, aggressive);
-                            Pathfinding.pathfindToward(rc, gen);
+                            Pathfinding.pathfindToward();
                         }
                     }
                     return;
@@ -343,7 +338,7 @@ public strictfp class RobotPlayer {
                             cautious.setNearbyEnemies(nearbyEnemies);
                             Pathfinding.setTarget(weakestLoc, cautious);
                         }
-                        Pathfinding.pathfindToward(rc, gen);
+                        Pathfinding.pathfindToward();
                     }
                 }
                 return;
@@ -352,7 +347,7 @@ public strictfp class RobotPlayer {
         }
     }
 
-    public static boolean retreat(RobotController rc, RobotInfo[] nearbyEnemies, boolean clearRubbleAggressively)
+    private static boolean retreat(RobotController rc, RobotInfo[] nearbyEnemies, boolean clearRubbleAggressively)
             throws GameActionException {
         MapLocation curLoc = rc.getLocation();
         boolean[] isAwayFromEnemy = Directions.dirsAwayFrom(nearbyEnemies, curLoc);
@@ -365,7 +360,6 @@ public strictfp class RobotPlayer {
         do {
             Direction d = Directions.RANDOM_DIRECTION_PERMUTATION[i];
             if (isAwayFromEnemy[Directions.dirToInt(d)]) {
-                MapLocation next = curLoc.add(d);
                 if (rc.canMove(d)) {
                     // if there's a free spot, take advantage of it
                     // immediately
@@ -391,7 +385,7 @@ public strictfp class RobotPlayer {
 
     // TODO: several of these methods are very similar. extract their
     // similarities somehow?
-    public static RobotInfo getWeakestInRange(MapLocation curLoc, RobotInfo[] nearby) {
+    private static RobotInfo getWeakestInRange(MapLocation curLoc, RobotInfo[] nearby) {
         RobotInfo result = null;
         double minHealth = Double.MAX_VALUE;
         for (int i = nearby.length; --i >= 0; ) {
@@ -407,7 +401,7 @@ public strictfp class RobotPlayer {
         return result;
     }
 
-    public static RobotInfo getWeakest(RobotInfo[] nearby) {
+    private static RobotInfo getWeakest(RobotInfo[] nearby) {
         RobotInfo result = null;
         double minHealth = Double.MAX_VALUE;
         for (int i = nearby.length; --i >= 0; ) {

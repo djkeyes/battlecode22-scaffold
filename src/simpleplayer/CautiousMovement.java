@@ -2,6 +2,8 @@ package simpleplayer;
 
 import battlecode.common.*;
 
+import static simpleplayer.RobotPlayer.rc;
+
 public class CautiousMovement implements Movement {
     // movement strategy that avoids enemies
 
@@ -15,17 +17,17 @@ public class CautiousMovement implements Movement {
     }
 
     @Override
-    public boolean atGoal(RobotController rc, MapLocation target) {
+    public boolean atGoal(MapLocation target) {
         return rc.getLocation().equals(target);
     }
 
     @Override
-    public void move(RobotController rc, Direction dirToMove) throws GameActionException {
+    public void move(Direction dirToMove) throws GameActionException {
         rc.move(dirToMove);
     }
 
     @Override
-    public boolean canMove(RobotController rc, Direction dir) {
+    public boolean canMove(Direction dir) {
         if (!rc.canMove(dir)) {
             return false;
         }
@@ -34,8 +36,8 @@ public class CautiousMovement implements Movement {
     }
 
     @Override
-    public boolean canMoveIfImpatient(RobotController rc, Direction dir) {
-        return canMove(rc, dir);
+    public boolean canMoveIfImpatient(Direction dir) {
+        return canMove(dir);
     }
 
     public static boolean inEnemyRange(MapLocation loc, RobotInfo[] nearbyEnemies) {
