@@ -103,6 +103,47 @@ public strictfp class RobotPlayer {
                 }
             }
         }
+
+        tryHealingNearbyUnits();
+    }
+
+    private static void tryHealingNearbyUnits() throws GameActionException {
+        RobotInfo[] nearbyAllies = rc.senseNearbyRobots(myType.actionRadiusSquared, us);
+        RobotInfo weakestCombatUnit = null;
+        int weakestCombatUnitHp = Integer.MAX_VALUE;
+        RobotInfo weakestNoncombatUnit = null;
+        int weakestNonCombatUnitHp = Integer.MAX_VALUE;
+        RobotInfo weakestArchon = null;
+        int weakestArchonHp = Integer.MAX_VALUE;
+        for (RobotInfo ally : nearbyAllies) {
+            RobotType allyType = ally.getType();
+            if (ally.health == allyType.getMaxHealth(ally.level)) {
+                continue;
+            }
+            if (allyType == RobotType.ARCHON) {
+                if (ally.health < weakestArchonHp) {
+                    weakestArchon = ally;
+                    weakestArchonHp = ally.health;
+                }
+            } else if (allyType.canAttack()) {
+               if (ally.health < weakestCombatUnitHp) {
+                   weakestCombatUnit = ally;
+                   weakestCombatUnitHp = ally.health;
+               }
+            } else {
+                if (ally.health < weakestNonCombatUnitHp) {
+                    weakestNonCombatUnitHp = ally.health;
+                    weakestNoncombatUnit = ally;
+                }
+            }
+        }
+        if (weakestArchon != null) {
+            rc.repair(weakestArchon.location);
+        } else if (weakestCombatUnit != null) {
+            rc.repair(weakestCombatUnit.location);
+        } else if (weakestNoncombatUnit != null) {
+            rc.repair(weakestNoncombatUnit.location);
+        }
     }
 
     private static MapLocation lastTargetMiningLocation = null;
