@@ -46,6 +46,9 @@ public strictfp class RobotPlayer {
                     ourLead = rc.getTeamLeadAmount(us);
                     ourGold = rc.getTeamLeadAmount(us);
 
+                    String debugMessage = "AC: " + rc.getActionCooldownTurns() + ", MC: " + rc.getMovementCooldownTurns();
+                    rc.setIndicatorString(debugMessage);
+
                     switch (myType) {
                         case ARCHON:
                             runArchon();
