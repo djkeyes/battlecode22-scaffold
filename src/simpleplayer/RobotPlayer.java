@@ -19,6 +19,10 @@ public strictfp class RobotPlayer {
     public static int archonCount;
     public static int ourLead;
     public static int ourGold;
+    public static RobotInfo[] visibleAllies;
+    public static RobotInfo[] actableAllies;
+    public static RobotInfo[] visibleEnemies;
+    public static RobotInfo[] actableEnemies;
     public static MapLocation locAfterMovement; // anyone calling rc.move() MUST update this variable
 
     private static final Movement simpleMovement = new SimpleMovement();
@@ -35,6 +39,18 @@ public strictfp class RobotPlayer {
 
         Directions.initRandomDirections(gen);
 
+        // if more types need custom behavior, consider spliting them into separate files
+        try {
+            if (myType == RobotType.ARCHON) {
+                locAtStartOfTurn = rc.getLocation();
+                Communication.writeArchonLocation();
+            }
+        } catch (Exception e) {
+            // :(
+            e.printStackTrace();
+            Clock.yield();
+        }
+
         //noinspection InfiniteLoopStatement
         while (true) {
             try {
@@ -45,9 +61,15 @@ public strictfp class RobotPlayer {
                     archonCount = rc.getArchonCount();
                     ourLead = rc.getTeamLeadAmount(us);
                     ourGold = rc.getTeamLeadAmount(us);
+                    visibleAllies = rc.senseNearbyRobots(myType.visionRadiusSquared, us);
+                    actableAllies = rc.senseNearbyRobots(myType.actionRadiusSquared, us);
+                    visibleEnemies = rc.senseNearbyRobots(myType.visionRadiusSquared, them);
+                    actableEnemies = rc.senseNearbyRobots(myType.actionRadiusSquared, them);
 
                     String debugMessage = "AC: " + rc.getActionCooldownTurns() + ", MC: " + rc.getMovementCooldownTurns();
                     rc.setIndicatorString(debugMessage);
+
+                    reportEnemyArchons();
 
                     switch (myType) {
                         case ARCHON:
@@ -60,11 +82,18 @@ public strictfp class RobotPlayer {
                             runSoldier();
                             break;
                         case LABORATORY:
+                            break;
                         case WATCHTOWER:
+                            break;
                         case BUILDER:
+                            runBuilder();
+                            break;
                         case SAGE:
                             break;
                     }
+
+                    Communication.incrementUnitCount();
+
                     Clock.yield();
                 }
             } catch (Exception e) {
@@ -75,13 +104,66 @@ public strictfp class RobotPlayer {
         }
     }
 
+    private static void reportEnemyArchons() throws GameActionException {
+        for (RobotInfo r : visibleEnemies) {
+            if (r.type != RobotType.ARCHON) {
+                continue;
+            }
+            Communication.writeEnemyArchonLocation(r);
+        }
+    }
+
     private static void runArchon() throws GameActionException {
+
+        Communication.clearUnitCounts();
 
         if (!rc.isActionReady()) {
             return;
         }
 
-        if (robotCount - archonCount < 7) {
+        int numNearbyAttackers = 0;
+        int numNearbyMiners = 0;
+        int numNearbyLead = 0;
+        int effectiveNumNearbyLeadWorkersNeeded = 0;
+        for (RobotInfo r : visibleAllies) {
+            if (r.type == RobotType.MINER) {
+                ++numNearbyMiners;
+            }
+        }
+        for (RobotInfo r : visibleEnemies) {
+            if (r.type.canAttack()) {
+                ++numNearbyAttackers;
+            }
+        }
+        MapLocation[] leadLocations = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
+        numNearbyLead = leadLocations.length;
+        for (MapLocation location : leadLocations) {
+            int lead = rc.senseLead(location);
+            // some tiles are practically infinite, so we can't mine them all in one game.
+            lead = Math.min(lead, 9 * 5 * GameConstants.GAME_MAX_NUMBER_OF_ROUNDS);
+            // how many times could we mine from this tile for 45 lead each time over, say, the next 100 turns?
+            // for comparison, a lead tile with 1 lead can be mined for 5 lead once every 20 turns, so 25 per 100 turns
+            int timeHorizon = 40;
+            double timeToMine = Math.min((lead - 1) / 45., timeHorizon);
+            int numWorkers = (int) (timeToMine / 40. * 9);
+            effectiveNumNearbyLeadWorkersNeeded += numWorkers;
+        }
+        effectiveNumNearbyLeadWorkersNeeded += (numNearbyLead + 4) / 5;
+
+        int[] unitCounts = Communication.getLastTurnUnitCount();
+
+        if (numNearbyAttackers == 0 && effectiveNumNearbyLeadWorkersNeeded <= 0) {
+            // need to be creative, seems nothing good is nearby
+            // build a builder to grow a lead mine
+            if (RobotType.BUILDER.buildCostLead <= ourLead) {
+                for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+                    if (rc.canBuildRobot(RobotType.BUILDER, d)) {
+                        rc.buildRobot(RobotType.BUILDER, d);
+                        return;
+                    }
+                }
+            }
+        } else if (unitCounts[RobotType.MINER.ordinal()] < 5 || numNearbyMiners < effectiveNumNearbyLeadWorkersNeeded + 1) {
             // build workers
             if (RobotType.MINER.buildCostLead <= ourLead) {
                 for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
@@ -91,7 +173,6 @@ public strictfp class RobotPlayer {
                     }
                 }
             }
-
         } else {
             // build soldiers
             if (RobotType.SOLDIER.buildCostLead <= ourLead) {
@@ -108,28 +189,29 @@ public strictfp class RobotPlayer {
     }
 
     private static void tryHealingNearbyUnits() throws GameActionException {
-        RobotInfo[] nearbyAllies = rc.senseNearbyRobots(myType.actionRadiusSquared, us);
+        RobotInfo[] nearbyAllies = actableAllies;
         RobotInfo weakestCombatUnit = null;
         int weakestCombatUnitHp = Integer.MAX_VALUE;
         RobotInfo weakestNoncombatUnit = null;
         int weakestNonCombatUnitHp = Integer.MAX_VALUE;
-        RobotInfo weakestArchon = null;
-        int weakestArchonHp = Integer.MAX_VALUE;
+        //RobotInfo weakestArchon = null;
+        //int weakestArchonHp = Integer.MAX_VALUE;
         for (RobotInfo ally : nearbyAllies) {
             RobotType allyType = ally.getType();
             if (ally.health == allyType.getMaxHealth(ally.level)) {
                 continue;
             }
-            if (allyType == RobotType.ARCHON) {
+            /*if (allyType == RobotType.ARCHON) {
                 if (ally.health < weakestArchonHp) {
                     weakestArchon = ally;
                     weakestArchonHp = ally.health;
                 }
-            } else if (allyType.canAttack()) {
-               if (ally.health < weakestCombatUnitHp) {
-                   weakestCombatUnit = ally;
-                   weakestCombatUnitHp = ally.health;
-               }
+            } else */
+            if (allyType.canAttack()) {
+                if (ally.health < weakestCombatUnitHp) {
+                    weakestCombatUnit = ally;
+                    weakestCombatUnitHp = ally.health;
+                }
             } else {
                 if (ally.health < weakestNonCombatUnitHp) {
                     weakestNonCombatUnitHp = ally.health;
@@ -137,9 +219,10 @@ public strictfp class RobotPlayer {
                 }
             }
         }
-        if (weakestArchon != null) {
+        /*if (weakestArchon != null) {
             rc.repair(weakestArchon.location);
-        } else if (weakestCombatUnit != null) {
+        } else*/
+        if (weakestCombatUnit != null) {
             rc.repair(weakestCombatUnit.location);
         } else if (weakestNoncombatUnit != null) {
             rc.repair(weakestNoncombatUnit.location);
@@ -274,8 +357,8 @@ public strictfp class RobotPlayer {
     private static void runSoldier() throws GameActionException {
 
 
-        RobotInfo[] nearbyAllies = rc.senseNearbyRobots(locAtStartOfTurn, myType.visionRadiusSquared, us);
-        RobotInfo[] nearbyEnemies = rc.senseNearbyRobots(locAtStartOfTurn, myType.visionRadiusSquared, them);
+        RobotInfo[] nearbyAllies = visibleAllies;
+        RobotInfo[] nearbyEnemies = visibleEnemies;
 
         // do micro if we're near enemies
         if (nearbyEnemies.length > 0) {
@@ -295,8 +378,9 @@ public strictfp class RobotPlayer {
                 }
             }
 
-            // move randomly
-            // TODO: deduce archon positions, and go there.
+            if (tryMoveToClosestKnownEnemyArchonLocation()) {
+                return;
+            }
 
             if (tryMoveToInitialEnemyArchonLocations()) {
                 return;
@@ -304,6 +388,25 @@ public strictfp class RobotPlayer {
             tryMoveToRandomTarget();
 
         }
+    }
+
+    private static boolean tryMoveToClosestKnownEnemyArchonLocation() throws GameActionException {
+        MapLocation[] enemyArchonLocations = Communication.readEnemyArchonLocations();
+        MapLocation closest = null;
+        int closestDist = Integer.MAX_VALUE;
+        for (MapLocation loc : enemyArchonLocations) {
+            int distsq = loc.distanceSquaredTo(locAtStartOfTurn);
+            if (distsq < closestDist) {
+                closestDist = distsq;
+                closest = loc;
+            }
+        }
+        if (closest == null) {
+            return false;
+        }
+        Pathfinding.setTarget(closest, rubbleAverseMovement);
+        Pathfinding.pathfindToward();
+        return true;
     }
 
     private static MapLocation myInitialLocation = null;
@@ -582,6 +685,13 @@ public strictfp class RobotPlayer {
             }
         }
         return result;
+    }
+
+    private static void runBuilder() throws GameActionException {
+        if (rc.senseRubble(locAtStartOfTurn) == 0) {
+            rc.disintegrate();
+        }
+        tryMoveToRandomTarget();
     }
 
 }
