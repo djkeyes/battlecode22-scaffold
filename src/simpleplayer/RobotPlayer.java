@@ -697,7 +697,7 @@ public strictfp class RobotPlayer {
     }
 
     private static void runBuilder() throws GameActionException {
-        if (rc.senseRubble(locAtStartOfTurn) == 0) {
+        if (rc.senseLead(locAtStartOfTurn) == 0) {
             rc.disintegrate();
         }
         tryMoveToRandomTarget();
