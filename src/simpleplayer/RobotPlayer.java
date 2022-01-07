@@ -29,11 +29,17 @@ public strictfp class RobotPlayer {
     private static final Movement rubbleAverseMovement = new RubbleAverseMovement(30);
 
     private static int getRandomSeed() {
+        String key;
         if (us == Team.A) {
-            return Integer.parseInt(System.getProperty("bc.testing.team-a-seed"));
+            key = "bc.testing.team-a-seed";
         } else {
-            return Integer.parseInt(System.getProperty("bc.testing.team-b-seed"));
+            key = "bc.testing.team-b-seed";
         }
+        String value = System.getProperty(key);
+        if (value == null || value.isEmpty()) {
+            return 0;
+        }
+        return Integer.parseInt(value);
     }
 
     @SuppressWarnings("unused")
