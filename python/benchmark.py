@@ -5,32 +5,53 @@ import subprocess
 
 import numpy as np
 
-package_to_test = 'landscaperwaller'
+package_to_test = 'simpleplayer'
 params_to_test = ['']
 
 src_dir = './src/'
 # benchmarks, in the format (package name, commit hash, debug params)
 # (use a singleton list if no params to try)
 benchmarks = [
-    ('landscaperwaller', '67845ee2f53fb0bbe44c6356c55c1cb8c8467c71', ['']),
-    ('landscaperwaller', 'fe81b75ee074cab8955a3ab274a9d64c1268abfe', ['']), # attacks a little
-    ('landscaperwaller', 'fe2d4920cc05b243e132e656f16f288e11858f7a', ['']), # completely defensive
-    ('examplefuncsplayer', 'ec78354b0c75278446a2b6811ac993905b376b31', ['']),
-    ('noop', 'ec78354b0c75278446a2b6811ac993905b376b31', ['']),
-    ('pathfinding', 'fe81b75ee074cab8955a3ab274a9d64c1268abfe', ['']),
+    ('examplefuncsplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
+    ('simpleplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
+    ('noopplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
 ]
 
 maps = [
-    'ALandDivided',
-    'CentralLake',
-    'CentralSoup',
-    'FourLakeLand',
-    'SoupOnTheSide',
-    'TwoForOneAndTwoForAll',
-    'WaterBot',
-    'Big',
-    'Small',
-    'HardToPathfind'
+    'BigEmpty',
+    'MediumEmpty',
+    'SmallEmpty',
+
+    'InverseGradient',
+    'Mushroom',
+    'Pods',
+    '10x10',
+    'Hermits',
+    'Gradient',
+    'Random',
+    'AllRubble',
+    'BigMoney',
+    'Gladiators',
+    'XenosArrow',
+    'ARiverRunsThroughIt',
+    'Cave',
+    'Checkers2',
+    'Checkers',
+    'Corridor',
+    'Hawaii',
+    'KingOfTheHill',
+    'LeadIsHere',
+    'Squiggles',
+    'SuddenDeath',
+    'Turtle',
+    'Desert',
+
+    'HardToPathfind',
+
+    'TrollApocalypse',
+    'TrollOverflow',
+    'TrollBig',
+    'TrollCheckers',
 ]
 
 benchmark_prefix = 'benchmark'
@@ -65,7 +86,7 @@ print('performing benchmarks for package \'{}\'...'.format(package_to_test))
 
 print('checking out reference players...')
 
-np.random.seed(2017)
+np.random.seed(2022)
 
 # flatten and checkout
 flattened_benchmarks = []
@@ -105,7 +126,7 @@ for benchmark in benchmarks:
         flattened_benchmarks.append((generated_package, param))
 
 # TODO: might want to track win conditions and time to victory
-# a tiebreaker win at turn 3000 is much less convincing than a domination win at turn 500
+# a tiebreaker win at turn 2000 is much less convincing than an elimination win at turn 500
 
 
 # build packages once

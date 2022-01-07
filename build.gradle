@@ -256,6 +256,31 @@ task runDebug(type: JavaExec, dependsOn: 'build') {
             '-Dbc.server.save-file=' + project.property('replay')
     ]
 }
+task fastrun(type: JavaExec) {
+    description 'Runs a match without starting the client and without checking dependencies (be sure to build beforehand).'
+    group 'battlecode'
+
+    main = 'battlecode.server.Main'
+    classpath = sourceSets.main.runtimeClasspath
+    args = ['-c=-']
+    jvmArgs = [
+            '-Dbc.server.mode=headless',
+            '-Dbc.server.map-path=maps',
+            '-Dbc.server.debug=false',
+            '-Dbc.server.robot-player-to-system-out=false',
+            '-Dbc.engine.debug-methods=false',
+            '-Dbc.game.team-a='+project.property('teamA'),
+            '-Dbc.game.team-b='+project.property('teamB'),
+            '-Dbc.game.team-a.url='+project.property('classLocation'),
+            '-Dbc.game.team-b.url='+project.property('classLocation'),
+            '-Dbc.game.maps='+project.property('maps'),
+            '-Dbc.testing.team-a-seed='+project.property('seedA'),
+            '-Dbc.testing.team-b-seed='+project.property('seedB'),
+            '-Dbc.testing.team-a-param='+project.property('paramA'),
+            '-Dbc.testing.team-b-param='+project.property('paramB'),
+            '-Dbc.server.save-file=' + 'matches/' + project.property('teamA') + '-vs-' + project.property('teamB') + '-on-' + project.property('maps') + '.bc22'
+    ]
+}
 
 // This task prints out all available players, in the format that the `run`
 // task expects them to be given as.
