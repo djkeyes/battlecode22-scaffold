@@ -54,6 +54,18 @@ if (!project.hasProperty("classLocation")) {
 if (!project.hasProperty("replay")) {
     ext.replay = 'matches/' + project.property('teamA') + '-vs-' + project.property('teamB') + '-on-' + project.property('maps') + '.bc22'
 }
+if (!project.hasProperty("paramA")) {
+    ext.paramA = ""
+}
+if (!project.hasProperty("paramB")) {
+    ext.paramB = ""
+}
+if (!project.hasProperty("seedA")) {
+    ext.seedA = ""
+}
+if (!project.hasProperty("seedB")) {
+    ext.seedB = ""
+}
 
 // Mark the client as a special dependency, so that we can handle it separately.
 configurations {
@@ -268,6 +280,7 @@ task fastrun(type: JavaExec) {
             '-Dbc.server.map-path=maps',
             '-Dbc.server.debug=false',
             '-Dbc.server.robot-player-to-system-out=false',
+            '-Dbc.server.websocket=false',
             '-Dbc.engine.debug-methods=false',
             '-Dbc.game.team-a='+project.property('teamA'),
             '-Dbc.game.team-b='+project.property('teamB'),

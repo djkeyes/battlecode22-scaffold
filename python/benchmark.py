@@ -2,19 +2,28 @@
 import os
 import platform
 import subprocess
+import shutil
+import itertools
+import yaml
+from collections import deque
 
+import tqdm
 import numpy as np
 
-package_to_test = 'simpleplayer'
-params_to_test = ['']
-
 src_dir = './src/'
-# benchmarks, in the format (package name, commit hash, debug params)
+checkout_dir = './benchmarker/scratch/'
+build_dir = checkout_dir + 'build/'
+
+# benchmarks, in the format (package name, commit hash or branch, debug params)
 # (use a singleton list if no params to try)
-benchmarks = [
+reference_benchmarks = [
     ('examplefuncsplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
     ('simpleplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
     ('noopplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
+]
+
+latest_bots = [
+    ('simpleplayer', ['']),
 ]
 
 maps = [
@@ -48,7 +57,7 @@ maps = [
 
     'HardToPathfind',
 
-    'TrollApocalypse',
+    #'TrollApocalypse',
     'TrollOverflow',
     'TrollBig',
     'TrollCheckers',
@@ -56,196 +65,349 @@ maps = [
 
 benchmark_prefix = 'benchmark'
 
+benchmark_historical = False # compare all reference benchmarks
+benchmark_latest = True # compare the latest bots to reference
+
 runs_per_matchup = 2 # 100 or so would be better
 
 ###########################################
 
-# Terminal progress bar, from https://stackoverflow.com/a/34325723
-def printProgressBar(iteration, total, prefix = '', suffix = '', decimals = 1, length = 100, fill = '█', printEnd = "\r"):
-    """
-    Call in a loop to create terminal progress bar
-    @params:
-        iteration   - Required  : current iteration (Int)
-        total       - Required  : total iterations (Int)
-        prefix      - Optional  : prefix string (Str)
-        suffix      - Optional  : suffix string (Str)
-        decimals    - Optional  : positive number of decimals in percent complete (Int)
-        length      - Optional  : character length of bar (Int)
-        fill        - Optional  : bar fill character (Str)
-        printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
-    """
-    percent = ("{0:." + str(decimals) + "f}").format(100 * (iteration / float(total)))
-    filledLength = int(length * iteration // total)
-    bar = fill * filledLength + '-' * (length - filledLength)
-    print('\r%s |%s| %s%% %s' % (prefix, bar, percent, suffix), end = printEnd, flush=True)
-    # Print New Line on Complete
-    if iteration == total:
-        print()
+benchmark_prefix = 'benchmark'
 
-print('performing benchmarks for package \'{}\'...'.format(package_to_test))
+num_procs = 24
 
-print('checking out reference players...')
+###########################################
 
-np.random.seed(2022)
 
-# flatten and checkout
-flattened_benchmarks = []
-for benchmark in benchmarks:
-    orig_package = benchmark[0]
-    commit_hash = benchmark[1]
-    params = benchmark[2]
-    
-    package_path = src_dir + orig_package + '/'
-    
-    generated_package = benchmark_prefix + '_' + orig_package + '_' + commit_hash
-    generated_package_path = src_dir + generated_package + '/'
-    
-    if not os.path.exists(generated_package_path):
-        os.makedirs(generated_package_path)
-    
-    # this gives us a list of files in the directory at the commit
-    completed_process = subprocess.run(['git', 'cat-file', '-p',  commit_hash + ':' + package_path], stdout=subprocess.PIPE)
-    tokens = completed_process.stdout.split()
-    # each line contains 4 tokens only the 4th one is relevant
-    for line in range((int)(len(tokens)/4)):
+def get_gradle_command():
+    if platform.system() == 'Windows':
+        return 'gradlew.bat'
+    else:
+        return './gradlew'
+
+def create_match_command(team_a, team_b, param_a, param_b, map_name, seed_a, seed_b):
+    gradle_command = get_gradle_command()
+    param_a = ''.join(param_a)
+    param_b = ''.join(param_b)
+    command = [gradle_command, 'fastrun',
+        '-PteamA=' + team_a,
+        '-PteamB=' + team_b,
+        '-PparamA=' + param_a,
+        '-PparamB=' + param_b,
+        '-Pmaps=' + map_name,
+        '-PseedA=' + str(seed_a),
+        '-PseedB=' + str(seed_b),
+        '-Psource=' + checkout_dir,
+        '-PbuildDir=' + build_dir
+    ]
+    return command
+
+def clear_scratch():
+    if os.path.exists(checkout_dir):
+        shutil.rmtree(checkout_dir)
+    os.makedirs(checkout_dir)
+
+def checkout_benchmarks():
+    # flatten and checkout
+    flattened_benchmarks = []
+    for benchmark in reference_benchmarks:
+        orig_package, commit_identifier, params = benchmark
+
+        package_path = os.path.join(src_dir, orig_package)
+
+        generated_package = f'{benchmark_prefix}_{orig_package}_{commit_identifier}'
+        generated_package_path = os.path.join(checkout_dir, generated_package)
+
+        subprocess.run(['git', f'--work-tree={checkout_dir}', 'checkout', commit_identifier, '--', package_path])
+        shutil.move(os.path.join(checkout_dir, package_path), generated_package_path)
         # for each file, pipe it to sed to replace the package name, then write it to a new directory
-        token_num = line*4 + 3
-        decoded_name = tokens[token_num].decode('utf-8')
-        old_filename = package_path + decoded_name
-        new_filename = generated_package_path + decoded_name
-        pipe = subprocess.Popen(['git', 'cat-file', '-p',  commit_hash + ':' + old_filename], stdout=subprocess.PIPE)
-        with open(new_filename, 'w') as f:
-            # TODO(daniel): this could probably be done with shutil, which would help to make this script run on windows
-            package_regex = 's/package ' + orig_package + '/package ' + generated_package + '/'
-            static_import_regex = 's/import static ' + orig_package + '/import static ' + generated_package + '/'
-            command = ['sed', '-r', '; '.join([package_regex, static_import_regex])]
-            sed = subprocess.Popen(command, stdin=pipe.stdout, stdout=f)
+        for filename in os.listdir(generated_package_path):
+            full_filename = os.path.join(generated_package_path, filename)
+            pipe = subprocess.Popen(['cat', full_filename], stdout=subprocess.PIPE)
             pipe.wait()
-    
-    for param in params:
-        flattened_benchmarks.append((generated_package, param))
+            with open(full_filename, 'w') as f:
+                # TODO(daniel): this could probably be done with shutil, which would help to make this script run on windows
+                package_regex = 's/package ' + orig_package + '/package ' + generated_package + '/'
+                static_import_regex = 's/import static ' + orig_package + '/import static ' + generated_package + '/'
+                command = ['sed', '-r', '; '.join([package_regex, static_import_regex])]
+                sed = subprocess.Popen(command, stdin=pipe.stdout, stdout=f)
+                pipe.wait()
 
-# TODO: might want to track win conditions and time to victory
-# a tiebreaker win at turn 2000 is much less convincing than an elimination win at turn 500
+        flattened_benchmarks.append((generated_package, params))
+    return flattened_benchmarks
+
+def checkout_latest(latest_bots):
+    # just checkout
+    for latest in latest_bots:
+        orig_package, params = latest
+
+        package_path = os.path.join(src_dir, orig_package)
+
+        generated_package = f'{benchmark_prefix}_{orig_package}'
+        generated_package_path = os.path.join(checkout_dir, generated_package)
+
+        subprocess.run(['git', f'--work-tree={checkout_dir}', 'checkout', 'HEAD', '--', package_path])
+        shutil.move(os.path.join(checkout_dir, package_path), generated_package_path)
+
+def build_bots():
+    gradle_command = get_gradle_command()
+    command = [gradle_command, 'build', '-Psource=' + checkout_dir, '-PbuildDir=' + build_dir]
+    subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def get_match_winner(match_out):
+    winsIdx = match_out.find(b'wins')
+    prevNewlineIdx = match_out.rfind(b'\n', 0, winsIdx)
+    nextNewlineIdx = match_out.find(b'\n', winsIdx)
+    winString = match_out[prevNewlineIdx:nextNewlineIdx].decode('utf-8')
+    tokens = winString.split()
+    winner = tokens[2][1]
+    if winner == 'A':
+        return 0
+    else:
+        return 1
+
+def benchmark_round_robin(flattened_benchmarks):
+    # TODO: might want to track win conditions and time to victory
+    # a tiebreaker win at turn 2000 is much less convincing than a win at turn 100
+
+    num_wins = np.zeros((len(flattened_benchmarks), len(flattened_benchmarks), len(maps)))
+    num_games = np.zeros_like(num_wins)
+    iteration = 0
+    matchups = list(itertools.permutations(range(len(flattened_benchmarks)), r=2))
+    total_iterations = len(matchups) * len(maps) * runs_per_matchup
+    print(f'running matches ({total_iterations} matches total)...')
+    progress_bar = tqdm.tqdm(total=total_iterations)
+    progress_bar.update(iteration)
+    match_commands = deque()
+    for i, j in matchups:
+        for s, map in enumerate(maps):
+            team_a, param_a = flattened_benchmarks[i]
+            team_b, param_b = flattened_benchmarks[j]
+            for k in range(runs_per_matchup):
+                seed_a = 2*(k * len(maps) + s)
+                seed_b = seed_a + 1
+
+                command = create_match_command(team_a, team_b, param_a, param_b, map, seed_a, seed_b)
+                matchup_args = (i, j, s)
+                match_commands.append((matchup_args, command))
+    async_match_commands = deque()
+    for _ in range(min(num_procs, len(match_commands))):
+        (matchup_args, command) = match_commands.popleft()
+        async_match_commands.append((matchup_args, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)))
+    while len(async_match_commands) > 0:
+        (matchup_args, process) = async_match_commands.popleft()
+        (i, j, s) = matchup_args
+        # TODO: use the multiprocessing api to do this more consistently
+        process.wait()
+        stdout, stderr = process.communicate()
+
+        if len(stderr) > 0:
+            print('\nEncountered a long error message. is the process running correctly? to reproduce, run:')
+            print(" ".join(command))
+            print()
+            print(stderr)
+
+        winner = get_match_winner(stdout)
+        if winner == 0:
+            num_wins[i, j, s] += 1
+        else:
+            num_wins[j, i, s] += 1
+        num_games[i, j, s] += 1
+        num_games[j, i, s] += 1
+
+        iteration += 1
+        progress_bar.update(1)
+
+        if len(match_commands) > 0:
+            (matchup_args, command) = match_commands.popleft()
+            async_match_commands.append((matchup_args, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)))
 
 
-# build packages once
-print('building packages...')
-
-if platform.system() == 'Windows':
-    gradle_command = 'gradlew.bat'
-else:
-    gradle_command = './gradlew'
-command = [gradle_command, 'build']
-subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-
-num_wins = np.zeros([len(flattened_benchmarks), len(maps), len(params_to_test)])
-iteration = 0
-total_iterations = num_wins.size * runs_per_matchup
-print('running matches ({} matches total)...'.format(total_iterations))
-printProgressBar(iteration, total_iterations)
-for i, (generated_package, generated_param) in enumerate(flattened_benchmarks):
-    # run the match!
-    for j, map_name in enumerate(maps):
-        for k in range(runs_per_matchup):
-            for m, test_param in enumerate(params_to_test):
-                # swap teams, to avoid some kind of weird directional bias
-                if k % 2 == 0:
-                    teamA = package_to_test
-                    paramA = test_param
-                    teamB = generated_package
-                    paramB = generated_param
-                else:
-                    teamA = generated_package
-                    paramA = generated_param
-                    teamB = package_to_test
-                    paramB = test_param
-                maxInt = (2**31)-1
-                seedA = np.random.randint(maxInt)
-                seedB = np.random.randint(maxInt)
-                command = [gradle_command, 'fastrun', '-PteamA=' + teamA, '-PteamB=' + teamB, '-PparamA=' + paramA, '-PparamB=' + paramB, '-Pmaps=' + map_name,
-                    '-PseedA='+str(seedA), '-PseedB='+str(seedB)]
-                result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-                
-                # daniel: normally I get some warnings about L4J logger problems. If there's more errors than that, there might be a problem
-                if len(result.stderr) > 213:
-                    print('\nEncountered a long error message. is the process running correctly? to reproduce, run:')
-                    print(" ".join(command))
-                 
-                out = result.stdout
-                
-                matchStartIdx = out.find(b'Match Starting')
-                matchEndIdx = out.find(b'Match Finished')
-                if out[matchStartIdx:matchEndIdx].count(b'\n') > 4:
-                    print('\nEncountered a long stdout. Is a robot printing messages to stdout? to reproduce, run:')
-                    print(" ".join(command))            
-                
-                winsIdx = out.find(b'wins')
-                prevNewlineIdx = out.rfind(b'\n', 0, winsIdx)
-                nextNewlineIdx = out.find(b'\n', winsIdx)
-                winString = out[prevNewlineIdx:nextNewlineIdx].decode('utf-8')
-                tokens = winString.split()
-                winner = tokens[1]
-                if winner == package_to_test:
-                    num_wins[i, j, m] += 1.0
-                iteration += 1
-                printProgressBar(iteration, total_iterations)
-
-print()
-win_rate = num_wins / runs_per_matchup
-
-print()
-# these names are long and ugly, print them first
-print('\tBENCHMARK ID MAP')
-print('Id\tbenchmark param tuple'.format(i, benchmark))
-for i, benchmark in enumerate(flattened_benchmarks):
-    print('{}\t{}'.format(i, benchmark))
-
-
-for m, test_param in enumerate(params_to_test):
-
-    print()
-    print('-------------------------------------------------------------------------------------')
-    print('-------------------------------------------------------------------------------------')
-    print()
-    print('\tWIN RATES PER BENCHMARK PER MAP, param=' + test_param)
-    print('\t\t\tbenchmark Id')
-    print('\t\t', end='')
     for i in range(len(flattened_benchmarks)):
-        print('\t  {}'.format(i), end='')
+        for s in range(len(maps)):
+            num_games[i, i, s] = 1
+    win_rate = num_wins / num_games
+
+    print('\n\n', flush=True)
+
+    # these names are long and ugly, print them first
+    print('\tBENCHMARK ID MAP')
+    print('Id\tbenchmark param tuple')
+    for i, benchmark in enumerate(flattened_benchmarks):
+        print('{}\t{}'.format(i, benchmark))
+
+    for s in range(len(maps)):
+        print()
+        print('-------------------------------------------------------------------------------------')
+        print('-------------------------------------------------------------------------------------')
+        print()
+        map = maps[s]
+        print(f'\t\tROUND ROBIN WIN RATES PER MAP, map name={maps}')
+        print('\t\t\topponent Id')
+        print('\t\t', end='')
+        for j in range(len(flattened_benchmarks)):
+            print(f'\t  {j}', end='')
+        print('\toverall')
+
+        for i in range(len(flattened_benchmarks)):
+            print(f'\t\t  {i}', end='')
+            for j in range(len(flattened_benchmarks)):
+                print('\t{:.4f}'.format(win_rate[i, j, s]), end='')
+            mean_rate = np.sum(win_rate[i, :, s]) / (win_rate.shape[1] - 1)
+            print('\t{:.4f}'.format(np.mean(mean_rate)))
+
+    print()
+    print('-------------------------------------------------------------------------------------')
+    print()
+
+    print('\tOVERALL ROUND ROBIN WIN RATES')
+
+    print('\t\topponent Id')
+    print('\t', end='')
+    for j in range(len(flattened_benchmarks)):
+        print(f'\t  {j}', end='')
     print('\toverall')
 
-    for j in range(len(maps)):
-        if j == 0:
-            print('map', end='')
-        
-        short_map_name = maps[j]
-        short_map_name = '{0: <15}'.format(short_map_name)
-        if len(short_map_name) > 15:
-            short_map_name = short_map_name[:15]
-        print('\t{}\t'.format(short_map_name), end='')
-        for i in range(len(flattened_benchmarks)):
-            mean = win_rate[i, j, m]
-            print('{:.4f}\t'.format(mean), end='')
-        map_mean = np.mean(win_rate[:,j,m])
-        print('{:.4f}'.format(map_mean))
-
-
-    print()
-    print('-------------------------------------------------------------------------------------')
-    print()
-
-    print('\tOVERALL WIN RATES PER BENCHMARKS')
-
-    print('Id\twinrate')
     for i in range(len(flattened_benchmarks)):
-        print('{}\t{:.4f}'.format(i, np.mean(win_rate[i,:])))
+        print(f'\t  {i}', end='')
+        for j in range(len(flattened_benchmarks)):
+            print('\t{:.4f}'.format(np.mean(win_rate[i, j, :])), end='')
+        overall_mean = np.sum(win_rate[i, :, :]) / (win_rate.shape[1] - 1) / win_rate.shape[2]
+        print('\t{:.4f}'.format(overall_mean))
+
+
+
+def benchmark_latest_bots(latest_bots, flattened_reference_benchmarks):
+
+    num_wins = np.zeros((len(latest_bots), len(flattened_reference_benchmarks), len(maps)))
+    num_games = np.zeros_like(num_wins)
+    iteration = 0
+
+    matchups = list(itertools.product(range(len(latest_bots)), range(len(flattened_reference_benchmarks))))
+    total_iterations = len(matchups) * len(maps) * runs_per_matchup * 2
+    print(f'running matches ({total_iterations} matches total)...')
+    progress_bar = tqdm.tqdm(total=total_iterations)
+    progress_bar.update(iteration)
+    match_commands = deque()
+    for i, j in matchups:
+        for s, map in enumerate(maps):
+            for reverse in [False, True]:
+                team_a, param_a = latest_bots[i]
+                team_b, param_b = flattened_reference_benchmarks[j]
+                if reverse:
+                    team_a, param_a, team_b, param_b = team_b, param_b, team_a, param_a
+                for k in range(runs_per_matchup):
+                    seed_a = 2*(k * len(maps) + s)
+                    seed_b = seed_a + 1
+                    command = create_match_command(team_a, team_b, param_a, param_b, map, seed_a, seed_b)
+                    matchup_args = (i, j, s, reverse)
+                    match_commands.append((matchup_args, command))
+    async_match_commands = deque()
+    for _ in range(min(num_procs, len(match_commands))):
+        (matchup_args, command) = match_commands.popleft()
+        async_match_commands.append((matchup_args, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)))
+    while len(async_match_commands) > 0:
+        (matchup_args, process) = async_match_commands.popleft()
+        (i, j, s, reverse) = matchup_args
+        # TODO: use the multiprocessing api to do this more consistently
+        process.wait()
+        stdout, stderr = process.communicate()
+
+        if len(stderr) > 0:
+            print('\nEncountered a long error message. is the process running correctly? to reproduce, run:')
+            print(" ".join(command))
+            print()
+            print(stderr)
+
+        winner = get_match_winner(stdout)
+        if reverse:
+            winner = 1 - winner
+        if winner == 0:
+            num_wins[i, j, s] += 1
+        num_games[i, j, s] += 1
+
+        iteration += 1
+        progress_bar.update(1)
+
+        if len(match_commands) > 0:
+            (matchup_args, command) = match_commands.popleft()
+            async_match_commands.append((matchup_args, subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)))
+
+    win_rate = num_wins / num_games
+
+    print('\n\n', flush=True)
+
+    # these names are long and ugly, print them first
+    print('\tBENCHMARK ID MAP')
+    print('Id\tbenchmark param tuple')
+    for i, benchmark in enumerate(flattened_reference_benchmarks):
+        print('{}\t{}'.format(i, benchmark))
+
+    print()
+
+    print('\tBOT ID MAP')
+    print('Id\tbot name in working directory')
+    for i, bot in enumerate(latest_bots):
+        print('{}\t{}'.format(i, bot))
+
+    for s in range(len(maps)):
+        print()
+        print('-------------------------------------------------------------------------------------')
+        print('-------------------------------------------------------------------------------------')
+        print()
+        map = maps[s]
+        print(f'\t\tVS REFERENCE WIN RATES PER MAP, map name={map}')
+        print('\t\t\treference Id')
+        print('\t\t', end='')
+        for j in range(len(flattened_reference_benchmarks)):
+            print(f'\t  {j}', end='')
+        print('\toverall')
+
+        for i in range(len(latest_bots)):
+            print(f'\t\t  {i}', end='')
+            for j in range(len(flattened_reference_benchmarks)):
+                print('\t{:.4f}'.format(win_rate[i, j, s]), end='')
+            mean_rate = np.mean(win_rate[i, :, s])
+            print('\t{:.4f}'.format(np.mean(mean_rate)))
 
     print()
     print('-------------------------------------------------------------------------------------')
     print()
 
-    print('OVERALL MEAN WIN RATES: {}'.format(np.mean(win_rate)))
+    print('\tOVERALL VS REFERENCE WIN RATES')
+
+    print('\t\treference Id')
+    print('\t', end='')
+    for j in range(len(flattened_reference_benchmarks)):
+        print(f'\t  {j}', end='')
+    print('\toverall')
+
+    for i in range(len(latest_bots)):
+        print(f'\t  {i}', end='')
+        for j in range(len(flattened_reference_benchmarks)):
+            print('\t{:.4f}'.format(np.mean(win_rate[i, j, :])), end='')
+        overall_mean = np.mean(win_rate[i, :, :])
+        print('\t{:.4f}'.format(overall_mean))
+
+def main():
+
+    print('checking out reference players...')
+
+    clear_scratch()
+    flattened_reference_benchmarks = checkout_benchmarks()
+    checkout_latest(latest_bots)
+    build_bots()
+    if benchmark_historical:
+        print('performing round robin benchmarks...')
+        benchmark_round_robin(flattened_reference_benchmarks)
+
+    if benchmark_latest:
+        if len(latest_bots) > 1:
+            print('performing round robin of latest code...')
+            benchmark_round_robin(latest_bots)
+        print('comparing latest code to refence benchmarks...')
+        benchmark_latest_bots(latest_bots, flattened_reference_benchmarks)
 
 
-
+if __name__=="__main__":
+    main()
