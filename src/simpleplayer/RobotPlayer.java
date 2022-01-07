@@ -28,13 +28,22 @@ public strictfp class RobotPlayer {
     private static final Movement simpleMovement = new SimpleMovement();
     private static final Movement rubbleAverseMovement = new RubbleAverseMovement(30);
 
+    private static int getRandomSeed() {
+        if (us == Team.A) {
+            return Integer.parseInt(System.getProperty("bc.testing.team-a-seed"));
+        } else {
+            return Integer.parseInt(System.getProperty("bc.testing.team-b-seed"));
+        }
+    }
+
     @SuppressWarnings("unused")
     public static void run(RobotController inputRobotController) {
+        final int randomSeed = getRandomSeed();
         rc = inputRobotController;
         id = rc.getID();
         us = rc.getTeam();
         them = us.opponent();
-        gen = new Random(id);
+        gen = new Random(id * 131071L + randomSeed);
         myType = rc.getType();
 
         Directions.initRandomDirections(gen);
