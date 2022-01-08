@@ -404,7 +404,7 @@ def main():
         if len(latest_bots) > 1:
             print('performing round robin of latest code...')
             benchmark_round_robin(latest_bots)
-        print('comparing latest code to refence benchmarks...')
+        print('comparing latest code to reference benchmarks...')
         benchmark_latest_bots(latest_bots, flattened_reference_benchmarks)
 
 
