@@ -136,8 +136,8 @@ def checkout_benchmarks():
         flattened_benchmarks.append((generated_package, params))
     return flattened_benchmarks
 
-def checkout_latest(latest_bots):
-    # just checkout
+def copy_latest(latest_bots):
+    # just directly copy this--git doesn't know it exists yet.
     for latest in latest_bots:
         orig_package, params = latest
 
@@ -146,8 +146,7 @@ def checkout_latest(latest_bots):
         generated_package = f'{benchmark_prefix}_{orig_package}'
         generated_package_path = os.path.join(checkout_dir, generated_package)
 
-        subprocess.run(['git', f'--work-tree={checkout_dir}', 'checkout', 'HEAD', '--', package_path])
-        shutil.move(os.path.join(checkout_dir, package_path), generated_package_path)
+        shutil.copytree(package_path, generated_package_path)
 
 def build_bots():
     gradle_command = get_gradle_command()
@@ -395,7 +394,7 @@ def main():
 
     clear_scratch()
     flattened_reference_benchmarks = checkout_benchmarks()
-    checkout_latest(latest_bots)
+    copy_latest(latest_bots)
     build_bots()
     if benchmark_historical:
         print('performing round robin benchmarks...')
