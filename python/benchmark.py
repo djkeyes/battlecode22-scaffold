@@ -18,8 +18,8 @@ build_dir = checkout_dir + 'build/'
 # (use a singleton list if no params to try)
 reference_benchmarks = [
     ('examplefuncsplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
-    ('simpleplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
-    ('noopplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
+    ('simpleplayer', 'cc2802ceabebcd97895b5341bc2bc16bba1eab74', ['']),
+    #('noopplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
 ]
 
 latest_bots = [
@@ -58,9 +58,9 @@ maps = [
     'HardToPathfind',
 
     #'TrollApocalypse',
-    'TrollOverflow',
-    'TrollBig',
-    'TrollCheckers',
+    #'TrollOverflow',
+    #'TrollBig',
+    #'TrollCheckers',
 ]
 
 benchmark_prefix = 'benchmark'
