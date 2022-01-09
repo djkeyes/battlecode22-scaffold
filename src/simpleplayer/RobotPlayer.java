@@ -128,6 +128,8 @@ public strictfp class RobotPlayer {
         }
     }
 
+    private static int numSacrificialBuildersBuilt = 0;
+
     private static void runArchon() throws GameActionException {
 
         Communication.clearUnitCounts();
@@ -204,13 +206,14 @@ public strictfp class RobotPlayer {
 
         if (numNearbyArchons == 0 && numNearbyAttackers == 0 && numNearbyMiners < TARGET_MINERS_PER_QUADRANT * numQuadrants) {
             // No attackers nearby. Should probably farm economy
-            if (effectiveNumNearbyLeadWorkersNeeded <= numNearbyMiners) {
+            if (effectiveNumNearbyLeadWorkersNeeded <= numNearbyMiners && numSacrificialBuildersBuilt < 10) {
                 // need to be creative, seems nothing good is nearby
                 // build a builder to grow a lead mine
                 if (RobotType.BUILDER.buildCostLead <= ourLead) {
                     for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
                         if (rc.canBuildRobot(RobotType.BUILDER, d)) {
                             rc.buildRobot(RobotType.BUILDER, d);
+                            numSacrificialBuildersBuilt++;
                             return;
                         }
                     }
