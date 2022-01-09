@@ -25,8 +25,7 @@ public strictfp class RobotPlayer {
     public static RobotInfo[] actableEnemies;
     public static MapLocation locAfterMovement; // anyone calling rc.move() MUST update this variable
 
-    private static final Movement simpleMovement = new SimpleMovement();
-    private static final Movement rubbleAverseMovement = new RubbleAverseMovement(30);
+    private static final BFS pathfinder = new BFSDroid();
 
     private static int getRandomSeed() {
         String key;
@@ -85,6 +84,8 @@ public strictfp class RobotPlayer {
                     rc.setIndicatorString(debugMessage);
 
                     reportEnemyArchons();
+
+                    pathfinder.initTurn();
 
                     switch (myType) {
                         case ARCHON:
@@ -591,12 +592,7 @@ public strictfp class RobotPlayer {
 
         // okay to path away from target briefly, if we're bugging
         final double outOfVisionRangeMultiplier = 1.2f;
-        if (closestRadiusSquared <= myType.visionRadiusSquared * outOfVisionRangeMultiplier) {
-            Pathfinding.setTarget(lastTargetMiningLocation, simpleMovement);
-        } else {
-            Pathfinding.setTarget(lastTargetMiningLocation, rubbleAverseMovement);
-        }
-        Pathfinding.pathfindToward();
+        pathfinder.move(lastTargetMiningLocation);
 
         // maybe new mines opened up
         tryMiningAdjacentTiles();
@@ -712,8 +708,7 @@ public strictfp class RobotPlayer {
         if (closest == null) {
             return false;
         }
-        Pathfinding.setTarget(closest, rubbleAverseMovement);
-        Pathfinding.pathfindToward();
+        pathfinder.move(closest);
         return true;
     }
 
@@ -751,8 +746,7 @@ public strictfp class RobotPlayer {
         if (lastArchonTarget == null) {
             return false;
         }
-        Pathfinding.setTarget(lastArchonTarget, rubbleAverseMovement);
-        Pathfinding.pathfindToward();
+        pathfinder.move(lastArchonTarget);
         return true;
     }
 
@@ -765,13 +759,9 @@ public strictfp class RobotPlayer {
         if (lastTargetAttackLocation == null) {
             lastTargetAttackLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
         }
-        Pathfinding.setTarget(lastTargetAttackLocation, rubbleAverseMovement);
-        Pathfinding.pathfindToward();
+        pathfinder.move(lastTargetAttackLocation);
         return true;
     }
-
-    private static final CautiousMovement cautious = new CautiousMovement();
-    private static final SimpleMovement aggressive = new SimpleMovement();
 
     public static void doMicro(RobotController rc, RobotInfo[] nearbyAllies, RobotInfo[] nearbyEnemies) throws GameActionException {
         MapLocation curLoc = rc.getLocation();
@@ -861,8 +851,7 @@ public strictfp class RobotPlayer {
                             weakestLoc = weakest.location;
                         }
                         if (weakestLoc != null) {
-                            Pathfinding.setTarget(weakestLoc, aggressive);
-                            Pathfinding.pathfindToward();
+                            pathfinder.move(weakestLoc);
                         }
                     }
                     return;
@@ -893,13 +882,12 @@ public strictfp class RobotPlayer {
                     if (weakestLoc != null) {
                         if (nearbyAllies.length > nearbyEnemies.length) {
                             // lots of allies, be aggressive
-                            Pathfinding.setTarget(weakestLoc, aggressive);
+                            pathfinder.move(weakestLoc);
                         } else {
                             // few allies, be careful
-                            cautious.setNearbyEnemies(nearbyEnemies);
-                            Pathfinding.setTarget(weakestLoc, cautious);
+                            // TODO: in this situation, be cautious
+                            pathfinder.move(weakestLoc);
                         }
-                        Pathfinding.pathfindToward();
                     }
                 }
                 return;

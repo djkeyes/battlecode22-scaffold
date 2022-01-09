@@ -1,205 +1,209 @@
 package simpleplayer;
 
-import battlecode.common.Direction;
-import battlecode.common.GameActionException;
-import battlecode.common.MapLocation;
-import battlecode.common.RobotController;
+import battlecode.common.*;
 
-import java.util.Random;
+import java.util.HashSet;
 
 import static simpleplayer.RobotPlayer.*;
 
+// Largely copied from https://github.com/IvanGeffner/battlecode2021
+
 public class Pathfinding {
+    private MapLocation target = null;
+    private double avgImpassabilityInv = 10;
 
-    // this is a little buggy (no pun intended) in some edge cases, so we
-    // should either:
-    // -improve this bug implementation, or
-    // -create something smarter, like constructing a map on the fly (per robot,
-    // since there's no global team memory this year) and BFSing on the map when
-    // necessary
+    private BugNav bugNav = new BugNav();
 
-    private static Movement movementStrategy;
-    private static MapLocation target;
+    private static final Direction[] directions = {
+            Direction.NORTH,
+            Direction.NORTHEAST,
+            Direction.EAST,
+            Direction.SOUTHEAST,
+            Direction.SOUTH,
+            Direction.SOUTHWEST,
+            Direction.WEST,
+            Direction.NORTHWEST,
+            Direction.CENTER
+    };
 
-    // bug mode state
-    private static boolean inBugMode = false;
-    private static boolean isGoingLeft;
-    private static int distSqToTargetAtBugModeStart;
-    private static Direction dirAtStart;
+    private static int distance(MapLocation a, MapLocation b) {
+        return Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y));
+    }
 
-    private static int turnsSinceBlocked = 0;
-    private static int numTurns = 0;
+    private boolean[] impassable = null;
 
-    public static int PATIENCE = 3;
+    void setImpassable(boolean[] impassable) {
+        this.impassable = impassable;
+    }
 
-    private static Direction lastMoveDir;
+    void initTurn() {
+        impassable = new boolean[directions.length];
+    }
 
-    public static void setTarget(MapLocation target, Movement movementStrategy) {
-        if (!target.equals(Pathfinding.target) || Pathfinding.movementStrategy != movementStrategy) {
-            Pathfinding.target = target;
-            inBugMode = false;
-            Pathfinding.movementStrategy = movementStrategy;
+    boolean canMove(Direction dir) {
+        if (!rc.canMove(dir)) return false;
+        if (impassable[dir.ordinal()]) return false;
+        return true;
+    }
+
+    double getEstimation(MapLocation loc) {
+        try {
+            if (loc.distanceSquaredTo(target) == 0) return 0;
+            int d = distance(target, loc);
+            double r = rc.senseRubble(loc);
+            return 1.0 + r / 10.0 + (d - 1) * avgImpassabilityInv;
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        return 1e9;
+    }
+
+    public void move(MapLocation loc) {
+        if (rc.getMovementCooldownTurns() >= GameConstants.COOLDOWN_LIMIT) return;
+        target = loc;
+
+        //rc.setIndicatorLine(rc.getLocation(), target, 255, 0, 0);
+
+        if (!bugNav.move()) greedyPath();
+        bugNav.move();
+    }
+
+    final double eps = 1e-5;
+
+    void greedyPath() {
+        try {
+            MapLocation myLoc = rc.getLocation();
+            Direction bestDir = null;
+            double bestEstimation = 0;
+            double firstStep = 1.0 + rc.senseRubble(myLoc) / 10.0;
+            int contPassability = 0;
+            int bestEstimationDist = 0;
+            double avgP = 0;
+            for (Direction dir : directions) {
+                MapLocation newLoc = myLoc.add(dir);
+                if (!rc.onTheMap(newLoc)) continue;
+
+                //pass
+                avgP += 1.0 + rc.senseRubble(myLoc) / 10.0;
+                ++contPassability;
+
+
+                if (!canMove(dir)) continue;
+                if (!strictlyCloser(newLoc, myLoc, target)) continue;
+
+                int newDist = newLoc.distanceSquaredTo(target);
+
+                double estimation = firstStep + getEstimation(newLoc);
+                if (bestDir == null || estimation < bestEstimation - eps || (Math.abs(estimation - bestEstimation) <= 2 * eps && newDist < bestEstimationDist)) {
+                    bestEstimation = estimation;
+                    bestDir = dir;
+                    bestEstimationDist = newDist;
+                }
+            }
+            if (contPassability != 0) {
+                avgImpassabilityInv = avgP / contPassability;
+            }
+            if (bestDir != null) {
+                rc.move(bestDir);
+                locAfterMovement = locAtStartOfTurn.add(bestDir);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 
-    // precondition to this method: rc.isMovementReady() should return true
-    public static boolean pathfindToward() throws GameActionException {
-        if (movementStrategy.atGoal(target)) {
-            return false;
+    boolean strictlyCloser(MapLocation newLoc, MapLocation oldLoc, MapLocation target) {
+        int dOld = distance(target, oldLoc), dNew = distance(target, newLoc);
+        if (dOld < dNew) return false;
+        if (dNew < dOld) return true;
+        return target.distanceSquaredTo(newLoc) < target.distanceSquaredTo(oldLoc);
+
+    }
+
+    class BugNav {
+
+        BugNav() {
         }
 
-        if (inBugMode) {
-            if ((turnsSinceBlocked >= PATIENCE)
-                    || ((numTurns <= 0 || numTurns >= 8) && locAtStartOfTurn.distanceSquaredTo(target) <= distSqToTargetAtBugModeStart)) {
-                inBugMode = false;
-            }
-        }
+        final int INF = 1000000;
+        final int MAX_MAP_SIZE = GameConstants.MAP_MAX_HEIGHT;
 
-        if (!inBugMode) {
-            Direction dirToMove = null;
-            Direction dirToTarget = locAtStartOfTurn.directionTo(target);
+        boolean rotateRight = true; //if I should rotate right or left
+        MapLocation lastObstacleFound = null; //latest obstacle I've found in my way
+        int minDistToEnemy = INF; //minimum distance I've been to the enemy while going around an obstacle
+        MapLocation prevTarget = null; //previous target
+        HashSet<Integer> visited = new HashSet<>();
 
-            if (canMove(dirToTarget)) {
-                dirToMove = dirToTarget;
-            } else {
-                Direction[] dirs = new Direction[2];
-                Direction dirLeft = dirToTarget.rotateLeft();
-                Direction dirRight = dirToTarget.rotateRight();
-                if (locAtStartOfTurn.add(dirLeft).distanceSquaredTo(target) < locAtStartOfTurn.add(dirRight).distanceSquaredTo(target)) {
-                    dirs[0] = dirLeft;
-                    dirs[1] = dirRight;
-                } else {
-                    dirs[0] = dirRight;
-                    dirs[1] = dirLeft;
+        boolean move() {
+            try {
+
+                //different target? ==> previous data does not help!
+                if (prevTarget == null || target.distanceSquaredTo(prevTarget) > 0) resetPathfinding();
+
+                //If I'm at a minimum distance to the target, I'm free!
+                MapLocation myLoc = rc.getLocation();
+                int d = myLoc.distanceSquaredTo(target);
+                if (d <= minDistToEnemy) resetPathfinding();
+
+                int code = getCode();
+
+                if (visited.contains(code)) resetPathfinding();
+                visited.add(code);
+
+                //Update data
+                prevTarget = target;
+                minDistToEnemy = Math.min(d, minDistToEnemy);
+
+                //If there's an obstacle I try to go around it [until I'm free] instead of going to the target directly
+                Direction dir = myLoc.directionTo(target);
+                if (lastObstacleFound != null) dir = myLoc.directionTo(lastObstacleFound);
+                if (canMove(dir)) {
+                    resetPathfinding();
+                    return false;
                 }
-                for (Direction dir : dirs) {
+
+                //I rotate clockwise or counterclockwise (depends on 'rotateRight'). If I try to go out of the map I change the orientation
+                //Note that we have to try at most 16 times since we can switch orientation in the middle of the loop. (It can be done more efficiently)
+                for (int i = 8; i-- > 0; ) {
                     if (canMove(dir)) {
-                        dirToMove = dir;
-                        break;
+                        rc.move(dir);
+                        locAfterMovement = locAtStartOfTurn.add(dir);
+                        return true;
                     }
+                    MapLocation newLoc = myLoc.add(dir);
+                    if (!rc.onTheMap(newLoc)) rotateRight = !rotateRight;
+                        //If I could not go in that direction and it was not outside of the map, then this is the latest obstacle found
+                    else lastObstacleFound = myLoc.add(dir);
+                    if (rotateRight) dir = dir.rotateRight();
+                    else dir = dir.rotateLeft();
                 }
+
+                if (canMove(dir)) {
+                    rc.move(dir);
+                    locAfterMovement = locAtStartOfTurn.add(dir);
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
             }
-            if (dirToMove != null) {
-                move(dirToMove);
-                return true;
-            } else if (dirToMove == null) {
-                inBugMode = true;
-                resetBugMode();
-            }
+            return true;
         }
 
-        if (inBugMode) {
-            // BUGMODE
-
-            boolean onMapEdge;
-            if (isGoingLeft) {
-                onMapEdge = !rc.onTheMap(locAtStartOfTurn.add(lastMoveDir.rotateLeft()));
-            } else {
-                onMapEdge = !rc.onTheMap(locAtStartOfTurn.add(lastMoveDir.rotateRight()));
-            }
-            if (onMapEdge) {
-                isGoingLeft = !isGoingLeft;
-                resetBugMode();
-            }
-
-            turnsSinceBlocked++;
-            Direction possibleDir = dirAtStart;
-            Direction dir = null;
-
-            for (int i = 8; i-- > 0;) {
-                if (turnsSinceBlocked >= PATIENCE) {
-                    if (canMoveIfImpatient(possibleDir)) {
-                        dir = possibleDir;
-                        break;
-                    }
-                } else {
-                    if (canMove(possibleDir)) {
-                        dir = possibleDir;
-                        break;
-                    }
-                }
-
-                if (isGoingLeft) {
-                    possibleDir = possibleDir.rotateRight();
-                } else {
-                    possibleDir = possibleDir.rotateLeft();
-                }
-                turnsSinceBlocked = 0;
-            }
-
-            if (dir != null) {
-                move(dir);
-                numTurns += calculateBugRotation(dir);
-                lastMoveDir = dir;
-                if (isGoingLeft) {
-                    dirAtStart = dir.rotateLeft().rotateLeft();
-                } else {
-                    dirAtStart = dir.rotateLeft().rotateRight();
-                }
-            }
-
+        //clear some of the previous data
+        void resetPathfinding() {
+            lastObstacleFound = null;
+            minDistToEnemy = INF;
+            visited.clear();
         }
 
-        return false;
-    }
-
-    private static void move(Direction dirToMove) throws GameActionException {
-        movementStrategy.move(dirToMove);
-    }
-
-    private static int numRightRotations(Direction start, Direction end) {
-        return (end.ordinal() - start.ordinal() + 8) % 8;
-    }
-
-    private static int numLeftRotations(Direction start, Direction end) {
-        return (-end.ordinal() + start.ordinal() + 8) % 8;
-    }
-
-    private static int calculateBugRotation(Direction moveDir) {
-        if (isGoingLeft) {
-            return numRightRotations(dirAtStart, moveDir) - numRightRotations(dirAtStart, lastMoveDir);
-        } else {
-            return numLeftRotations(dirAtStart, moveDir) - numLeftRotations(dirAtStart, lastMoveDir);
+        int getCode() {
+            int x = rc.getLocation().x % MAX_MAP_SIZE;
+            int y = rc.getLocation().y % MAX_MAP_SIZE;
+            Direction obstacleDir = rc.getLocation().directionTo(target);
+            if (lastObstacleFound != null) obstacleDir = rc.getLocation().directionTo(lastObstacleFound);
+            int bit = rotateRight ? 1 : 0;
+            return (((((x << 6) | y) << 4) | obstacleDir.ordinal()) << 1) | bit;
         }
     }
 
-    private static boolean canMove(Direction dir) throws GameActionException {
-        return movementStrategy.canMove(dir);
-    }
 
-    private static boolean canMoveIfImpatient(Direction dir) {
-        return movementStrategy.canMoveIfImpatient(dir);
-    }
-
-    public static void resetBugMode() {
-        // // try to intelligently choose on which side we will keep the
-        // // wall
-        // Direction leftTryDir = bugLastMoveDir.rotateLeft();
-        // for (int i = 0; i < 3; i++) {
-        // if (!canMove(leftTryDir))
-        // leftTryDir = leftTryDir.rotateLeft();
-        // else
-        // break;
-        // }
-        // Direction rightTryDir = bugLastMoveDir.rotateRight();
-        // for (int i = 0; i < 3; i++) {
-        // if (!canMove(rightTryDir))
-        // rightTryDir = rightTryDir.rotateRight();
-        // else
-        // break;
-        // }
-        // if (dest.distanceSquaredTo(here.add(leftTryDir)) <
-        // dest.distanceSquaredTo(here.add(rightTryDir))) {
-        // bugWallSide = WallSide.RIGHT;
-        // } else {
-        // bugWallSide = WallSide.LEFT;
-        // }
-
-        distSqToTargetAtBugModeStart = locAtStartOfTurn.distanceSquaredTo(target);
-        dirAtStart = lastMoveDir = locAtStartOfTurn.directionTo(target);
-        numTurns = 0;
-        turnsSinceBlocked = 0;
-
-        isGoingLeft = gen.nextBoolean();
-    }
 }
