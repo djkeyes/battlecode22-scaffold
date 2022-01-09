@@ -1,5 +1,6 @@
 package simpleplayer;
 
+import battlecode.common.Clock;
 import battlecode.common.Direction;
 import battlecode.common.GameActionException;
 import battlecode.common.MapLocation;
@@ -561,8 +562,9 @@ public class BFSDroid extends BFS {
         v101 = 1000000;
         d101 = null;
 
+        //int before2 = Clock.getBytecodeNum();
         if (rc.onTheMap(l71)) {
-            if (!rc.isLocationOccupied(l71)) {
+            if (!rc.canSenseRobotAtLocation(l71)) {
                 p71 = 1.0 + 0.1 * rc.senseRubble(l71);
                 if (v71 > v84 + p71) {
                     v71 = v84 + p71;
@@ -571,7 +573,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l83)) {
-            if (!rc.isLocationOccupied(l83)) {
+            if (!rc.canSenseRobotAtLocation(l83)) {
                 p83 = 1.0 + 0.1 * rc.senseRubble(l83);
                 if (v83 > v84 + p83) {
                     v83 = v84 + p83;
@@ -584,7 +586,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l85)) {
-            if (!rc.isLocationOccupied(l85)) {
+            if (!rc.canSenseRobotAtLocation(l85)) {
                 p85 = 1.0 + 0.1 * rc.senseRubble(l85);
                 if (v85 > v84 + p85) {
                     v85 = v84 + p85;
@@ -597,7 +599,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l97)) {
-            if (!rc.isLocationOccupied(l97)) {
+            if (!rc.canSenseRobotAtLocation(l97)) {
                 p97 = 1.0 + 0.1 * rc.senseRubble(l97);
                 if (v97 > v84 + p97) {
                     v97 = v84 + p97;
@@ -614,7 +616,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l70)) {
-            if (!rc.isLocationOccupied(l70)) {
+            if (!rc.canSenseRobotAtLocation(l70)) {
                 p70 = 1.0 + 0.1 * rc.senseRubble(l70);
                 if (v70 > v84 + p70) {
                     v70 = v84 + p70;
@@ -631,7 +633,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l72)) {
-            if (!rc.isLocationOccupied(l72)) {
+            if (!rc.canSenseRobotAtLocation(l72)) {
                 p72 = 1.0 + 0.1 * rc.senseRubble(l72);
                 if (v72 > v84 + p72) {
                     v72 = v84 + p72;
@@ -648,7 +650,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l96)) {
-            if (!rc.isLocationOccupied(l96)) {
+            if (!rc.canSenseRobotAtLocation(l96)) {
                 p96 = 1.0 + 0.1 * rc.senseRubble(l96);
                 if (v96 > v84 + p96) {
                     v96 = v84 + p96;
@@ -665,7 +667,7 @@ public class BFSDroid extends BFS {
             }
         }
         if (rc.onTheMap(l98)) {
-            if (!rc.isLocationOccupied(l98)) {
+            if (!rc.canSenseRobotAtLocation(l98)) {
                 p98 = 1.0 + 0.1 * rc.senseRubble(l98);
                 if (v98 > v84 + p98) {
                     v98 = v84 + p98;
@@ -1709,6 +1711,8 @@ public class BFSDroid extends BFS {
                 d138 = d126;
             }
         }
+        //int after2 = Clock.getBytecodeNum();
+        //System.out.println("time to perform search: " + (after2 - before2));
 
         int dx = target.x - l84.x;
         int dy = target.y - l84.y;
@@ -1889,6 +1893,7 @@ public class BFSDroid extends BFS {
                 break;
         }
 
+        int before4 = Clock.getBytecodeNum();
         Direction ans = null;
         double bestEstimation = 0;
         double initialDist = Math.sqrt(l84.distanceSquaredTo(target));

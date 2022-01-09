@@ -1,9 +1,6 @@
 package simpleplayer;
 
-import battlecode.common.GameActionException;
-import battlecode.common.MapLocation;
-import battlecode.common.RobotInfo;
-import battlecode.common.RobotType;
+import battlecode.common.*;
 
 import static simpleplayer.RobotPlayer.*;
 
@@ -13,28 +10,25 @@ public class Miner {
 
     private static final int MIN_LEAD_AMOUNT = 2;
 
-    private static final int RADIUS_TO_CONSIDER_FOR_ASSIGNMENT = 3;
+    private static final int RADIUS_TO_CONSIDER_FOR_ASSIGNMENT = 1;
     private static final int DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT = 2 * RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1;
-    private static int[][] minerAssignments = null;
+    //private static int[][] minerAssignments = null;
     private static long[][] resourcesAvailable = null;
     private static RobotInfo[] minersToConsider = null;
 
     private static MapLocation[] nearbyLead;
     private static MapLocation[] nearbyGold;
 
-    private static final int CENTER_PRIORITY = 2000000;
-    private static final int EDGE_PRIORITY = 1000000;
-    private static final int PRIORITY_MOD = 1000000;
+    private static int assignResources() throws GameActionException {
 
-    private static void assignResources() throws GameActionException {
-        if (minerAssignments == null) {
-            minerAssignments = new int[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
+        if (resourcesAvailable == null) {
+            //minerAssignments = new int[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
             resourcesAvailable = new long[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
             minersToConsider = new RobotInfo[25];
         } else {
             // Surprisingly, reallocating is cheaper than Arrays.fill or System.arraycopy. So that's dumb.
-            minerAssignments = new int[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
-            resourcesAvailable = new long[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
+            //minerAssignments = new int[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
+            //resourcesAvailable = new long[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
         }
 
         // assign nearby resources to nearby miners, in order to encourage miners to stay in place once they've found a
@@ -44,35 +38,39 @@ public class Miner {
         // Of course, since miners don't have infinite sight, they might not choose the same alotment.
         // For now, I use the following rule:
         // Miners own any tile they are adjacent to. If there is a tie, on top of > edge adjacent > diagonal adjacent.
-        // If there is a tie after that, the robot with the higher ID wins.
+        // If there is a tie after that, it's broken by the order in minersToConsider, which is arbitray.
         // Also, if there's a tile with a lot of resources (more than RESOURCE_ALLOCATION_PER_TILE), we can assign
         // multiple miners to it, up to amount/RESOURCE_ALLOCATION_PER_TILE.
 
-        for (int i = nearbyLead.length; --i >= 0; ) {
-            MapLocation loc = nearbyLead[i];
-            int dx = loc.x - locAtStartOfTurn.x;
-            if (dx > RADIUS_TO_CONSIDER_FOR_ASSIGNMENT || dx < -RADIUS_TO_CONSIDER_FOR_ASSIGNMENT) {
-                continue;
-            }
-            int dy = loc.y - locAtStartOfTurn.y;
-            if (dy > RADIUS_TO_CONSIDER_FOR_ASSIGNMENT || dy < -RADIUS_TO_CONSIDER_FOR_ASSIGNMENT) {
-                continue;
-            }
-            int amount = rc.senseLead(loc);
-            resourcesAvailable[dx + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][dy + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] += amount;
-        }
-        for (int i = nearbyGold.length; --i >= 0; ) {
-            MapLocation loc = nearbyGold[i];
-            int dx = loc.x - locAtStartOfTurn.x;
-            if (dx > RADIUS_TO_CONSIDER_FOR_ASSIGNMENT || dx < -RADIUS_TO_CONSIDER_FOR_ASSIGNMENT) {
-                continue;
-            }
-            int dy = loc.y - locAtStartOfTurn.y;
-            if (dy > RADIUS_TO_CONSIDER_FOR_ASSIGNMENT || dy < -RADIUS_TO_CONSIDER_FOR_ASSIGNMENT) {
-                continue;
-            }
-            int amount = rc.senseGold(loc);
-            resourcesAvailable[dx + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][dy + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] += amount;
+        {
+            // for dense resource maps, this seems fast for scanning the immediate area
+            MapLocation loc = locAtStartOfTurn;
+            resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.EAST);
+            resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.NORTH);
+            resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.WEST);
+            resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.WEST);
+            resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.SOUTH);
+            resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.SOUTH);
+            resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.EAST);
+            resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+            loc = loc.add(Direction.EAST);
+            resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
         }
 
         RobotInfo[] nearbyRobots = rc.senseNearbyRobots(8, us);
@@ -83,95 +81,188 @@ public class Miner {
                 ++numMiners;
             }
         }
-        minersToConsider[numMiners] = rc.senseRobot(id);
-        minersToConsider[numMiners + 1] = null;
+        minersToConsider[numMiners] = null;
 
         int myX = locAtStartOfTurn.x;
         int myY = locAtStartOfTurn.y;
         final int RESOURCE_ALLOCATION_PER_TILE = 10;
-        // first, assign on-location
         {
             for (int i = 0; minersToConsider[i] != null; ++i) {
+                // this unrolled version seems faster than a complicated series of for-loops
                 RobotInfo miner = minersToConsider[i];
                 MapLocation loc = miner.location;
                 int relX = loc.x - myX + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
                 int relY = loc.y - myY + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-                int minerId = miner.getID();
+                switch (relX) {
+                    case -2:
+                        switch (relY) {
+                            case -2:
+                                // far corner
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case -1:
+                                // slant angle
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 0:
+                                // edge, one space away
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 1:
+                                // slant angle
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 2:
+                                // far corner
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                        }
+                        break;
+                    case -1:
+                        switch (relY) {
+                            case -2:
+                                // slant angle
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case -1:
+                                // diag adj
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 0:
+                                // adj
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 1:
+                                // diag adj
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 2:
+                                // slant angle
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                        }
+                        break;
+                    case 0:
+                        switch (relY) {
+                            case -2:
+                                // edge, one space away
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case -1:
+                                // adj
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 1:
+                                // adj
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 2:
+                                // edge, one space away
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                        }
+                        break;
+                    case 1:
+                        switch (relY) {
+                            case -2:
+                                // slant angle
+                                resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case -1:
+                                // diag adj
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 0:
+                                // adj
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 1:
+                                // diag adj
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 2:
+                                // slant angle
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                        }
+                        break;
+                    case 2:
+                        switch (relY) {
+                            case -2:
+                                // far corner
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case -1:
+                                // slant angle
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 0:
+                                // edge, one space away
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 1:
+                                // slant angle
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][0 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                            case 2:
+                                // far corner
+                                resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT] -= RESOURCE_ALLOCATION_PER_TILE;
+                                break;
+                        }
+                        break;
+                }
+            }
+        }
+
+        int numTilesAssignedToUs = 0;
+        for (int relX = RADIUS_TO_CONSIDER_FOR_ASSIGNMENT - 1; relX <= RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1; ++relX) {
+            for (int relY = RADIUS_TO_CONSIDER_FOR_ASSIGNMENT - 1; relY <= RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1; ++relY) {
                 if (resourcesAvailable[relX][relY] > 0) {
-                    minerAssignments[relX][relY] = CENTER_PRIORITY + minerId;
-                    resourcesAvailable[relX][relY] -= RESOURCE_ALLOCATION_PER_TILE;
-                    if (resourcesAvailable[relX][relY] == 0) {
-                        // assign a negative number, so other miners know this resource is contested
-                        resourcesAvailable[relX][relY] = -1;
-                    }
+                    ++numTilesAssignedToUs;
                 }
             }
         }
-        // next, edges
-        {
-            for (int i = 0; minersToConsider[i] != null; ++i) {
-                RobotInfo miner = minersToConsider[i];
-                MapLocation loc = miner.location;
-                int minerId = miner.getID();
-                // TODO: unroll these loops, if you're tight on bytecodes
-                for (int dx = -1; dx <= 1; dx += 2) {
-                    int relX = loc.x - myX + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + dx;
-                    int relY = loc.y - myY + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-                    if (resourcesAvailable[relX][relY] > 0) {
-                        // still some resources here
-                        resourcesAvailable[relX][relY] -= RESOURCE_ALLOCATION_PER_TILE;
-                        if (resourcesAvailable[relX][relY] == 0) {
-                            resourcesAvailable[relX][relY] = -1;
-                        }
-                        if (minerAssignments[relX][relY] < EDGE_PRIORITY + minerId) {
-                            minerAssignments[relX][relY] = EDGE_PRIORITY + minerId;
-                        }
-                    } else if (resourcesAvailable[relX][relY] < 0 && minerAssignments[relX][relY] < EDGE_PRIORITY + minerId) {
-                        minerAssignments[relX][relY] = EDGE_PRIORITY + minerId;
-                    }
-                }
-                for (int dy = -1; dy <= 1; dy += 2) {
-                    int relX = loc.x - myX + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-                    int relY = loc.y - myY + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + dy;
-                    if (resourcesAvailable[relX][relY] > 0) {
-                        resourcesAvailable[relX][relY] -= RESOURCE_ALLOCATION_PER_TILE;
-                        if (resourcesAvailable[relX][relY] == 0) {
-                            resourcesAvailable[relX][relY] = -1;
-                        }
-                        if (minerAssignments[relX][relY] < EDGE_PRIORITY + minerId) {
-                            minerAssignments[relX][relY] = EDGE_PRIORITY + minerId;
-                        }
-                    } else if (resourcesAvailable[relX][relY] < 0 && minerAssignments[relX][relY] < EDGE_PRIORITY + minerId) {
-                        minerAssignments[relX][relY] = EDGE_PRIORITY + minerId;
-                    }
-                }
-            }
-        }
-        // next, corners
-        {
-            for (int i = 0; minersToConsider[i] != null; ++i) {
-                RobotInfo miner = minersToConsider[i];
-                MapLocation loc = miner.location;
-                int minerId = miner.getID();
-                for (int dx = -1; dx <= 1; dx += 2) {
-                    for (int dy = -1; dy <= 1; dy += 2) {
-                        int relX = loc.x - myX + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + dx;
-                        int relY = loc.y - myY + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + dy;
-                        if (resourcesAvailable[relX][relY] > 0) {
-                            resourcesAvailable[relX][relY] -= 5;
-                            if (resourcesAvailable[relX][relY] == 0) {
-                                resourcesAvailable[relX][relY] = -1;
-                            }
-                            if (minerAssignments[relX][relY] < minerId) {
-                                minerAssignments[relX][relY] = minerId;
-                            }
-                        } else if (resourcesAvailable[relX][relY] < 0 && minerAssignments[relX][relY] < minerId) {
-                            minerAssignments[relX][relY] = minerId;
-                        }
-                    }
-                }
-            }
-        }
+        return numTilesAssignedToUs;
     }
 
     public static void runMiner() throws GameActionException {
@@ -179,17 +270,18 @@ public class Miner {
         nearbyGold = rc.senseNearbyLocationsWithGold(myType.visionRadiusSquared);
 
         // initializes minerAssignments, which can be used to share resources with other miners
-        assignResources();
+        int numTilesAssignedToUs = assignResources();
 
         // now check the ones assigned to us. How many did we get?
-        int numTilesAssignedToUs = 0;
-        for (int relX = RADIUS_TO_CONSIDER_FOR_ASSIGNMENT - 1; relX <= RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1; ++relX) {
-            for (int relY = RADIUS_TO_CONSIDER_FOR_ASSIGNMENT - 1; relY <= RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1; ++relY) {
-                if (minerAssignments[relX][relY] % PRIORITY_MOD == id) {
-                    ++numTilesAssignedToUs;
-                }
-            }
+
+        if (numTilesAssignedToUs >= 5) {
+            // just stay here
+            lastTargetMiningLocation = locAtStartOfTurn;
+            tryMiningAdjacentTiles();
+            return;
         }
+
+        //int before2 = Clock.getBytecodeNum();
 
         // See if there are any farms that can be harvested right now. If there are none, but we have some assigned to
         // us, just hang around our assignments.
@@ -204,13 +296,9 @@ public class Miner {
             MapLocation resourceLocation = nearbyLead[i];
             int dx = resourceLocation.x - myX;
             int dy = resourceLocation.y - myY;
-            int relX = dx + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-            int relY = dy + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-            if (relX > 0 && relY > 0 && relX < minerAssignments.length && relY < minerAssignments.length) {
-                if (minerAssignments[relX][relY] != 0) {
-                    // this is assigned to someone (if it's assigned to us, we'll consider it later). skip it.
-                    continue;
-                }
+            if (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) {
+                // this is already adjacent to us, so don't consider it for the search.
+                continue;
             }
             if (rc.senseLead(resourceLocation) < MIN_LEAD_AMOUNT) {
                 continue;
@@ -234,13 +322,9 @@ public class Miner {
             MapLocation resourceLocation = nearbyGold[i];
             int dx = resourceLocation.x - myX;
             int dy = resourceLocation.y - myY;
-            int relX = dx + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-            int relY = dy + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT;
-            if (relX > 0 && relY > 0 && relX < minerAssignments.length && relY < minerAssignments.length) {
-                if (minerAssignments[relX][relY] != 0) {
-                    // this is assigned to someone (if it's assigned to us, we'll consider it later). skip it.
-                    continue;
-                }
+            if (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) {
+                // this is already adjacent to us, so don't consider it for the search.
+                continue;
             }
             int rSquare = dx * dx + dy * dy;
             if (rSquare < closestGoldRadiusSquared) {
@@ -256,25 +340,15 @@ public class Miner {
 
         // if there are multiple options, prefer gold, since it's a tiebreaker
         MapLocation closestResource = nearestVisibleUnassignedGoldLocation;
-        int closestRadiusSquared = closestGoldRadiusSquared;
         MapLocation secondClosestResource = secondNearestUnassignedVisibleGoldLocation;
-        int secondClosestRadiusSquared = secondClosestGoldRadiusSquared;
         if (closestResource == null) {
             closestResource = nearestVisibleUnassignedLeadLocation;
-            closestRadiusSquared = closestLeadRadiusSquared;
             secondClosestResource = secondNearestUnassignedVisibleLeadLocation;
-            secondClosestRadiusSquared = secondLeadClosestRadiusSquared;
         } else if (secondClosestResource == null) {
             secondClosestResource = nearestVisibleUnassignedLeadLocation;
-            secondClosestRadiusSquared = closestLeadRadiusSquared;
         }
-
-        if (numTilesAssignedToUs >= 5) {
-            // just stay here
-            lastTargetMiningLocation = closestResource;
-            tryMiningAdjacentTiles();
-            return;
-        }
+        //int after2 = Clock.getBytecodeNum();
+        //System.out.println("bcs to find nearest resources: " + (after2 - before2));
 
         // travel to nearest resource
         if (lastTargetMiningLocation != null && locAtStartOfTurn.distanceSquaredTo(lastTargetMiningLocation) <= 2) {
@@ -299,8 +373,6 @@ public class Miner {
             lastTargetMiningLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
         }
 
-        // okay to path away from target briefly, if we're bugging
-        final double outOfVisionRangeMultiplier = 1.2f;
         pathfinder.move(lastTargetMiningLocation);
 
         // maybe new mines opened up
