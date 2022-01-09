@@ -79,35 +79,28 @@ public class Communication {
         writeInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + enemyArchonIndex, enemyArchon.location);
     }
 
+    public static void clearEnemyArchonLocation(int enemyArchonIndex) throws GameActionException {
+        writeInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + enemyArchonIndex, null);
+    }
+
     public static MapLocation[] readEnemyArchonLocations() throws GameActionException {
         MapLocation a0 = readInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + 0);
         MapLocation a1 = readInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + 1);
         MapLocation a2 = readInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + 2);
         MapLocation a3 = readInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + 3);
-        int numReported = (a0 != null ? 1 : 0) + (a1 != null ? 1 : 0) + (a2 != null ? 1 : 0) + (a3 != null ? 1 : 0);
-        MapLocation[] result = new MapLocation[numReported];
-        int tail = 0;
-        if (a0 != null) {
-            result[tail++] = a0;
-        }
-        if (a1 != null) {
-            result[tail++] = a1;
-        }
-        if (a2 != null) {
-            result[tail++] = a2;
-        }
-        if (a3 != null) {
-            result[tail] = a3;
-        }
-        return result;
+        return new MapLocation[]{a0, a1, a2, a3};
     }
 
     private static void writeInterestingLocationSparse(int index, MapLocation location) throws GameActionException {
         // writes a location using 2^12 bits, leaving 4 bits unused
         // actually, this uses slightly less than 2^12
         // offset by 1, so that 0 represents null values
-        int encoded = location.x * GameConstants.MAP_MAX_HEIGHT + location.y + 1;
-        rc.writeSharedArray(index, encoded);
+        if (location == null) {
+            rc.writeSharedArray(index, 0);
+        } else {
+            int encoded = location.x * GameConstants.MAP_MAX_HEIGHT + location.y + 1;
+            rc.writeSharedArray(index, encoded);
+        }
     }
 
     private static MapLocation readInterestingLocationSparse(int index) throws GameActionException {
@@ -128,10 +121,15 @@ public class Communication {
     private static void writeInterestingLocationWithCoarseExpiry(int index, MapLocation location) throws GameActionException {
         // writes a location using around 2^12 bits, using the remaining bits to store a timestamp which expires
         // after about 100-200 turns
-        int timestamp = TIMESTAMP_GRANULARITY * rc.getRoundNum() / (GameConstants.GAME_MAX_NUMBER_OF_ROUNDS + 1);
 
-        int encoded = (location.x * GameConstants.MAP_MAX_HEIGHT + location.y) * TIMESTAMP_GRANULARITY + timestamp + 1;
-        rc.writeSharedArray(index, encoded);
+        if (location == null) {
+            rc.writeSharedArray(index, 0);
+        } else {
+            int timestamp = TIMESTAMP_GRANULARITY * rc.getRoundNum() / (GameConstants.GAME_MAX_NUMBER_OF_ROUNDS + 1);
+
+            int encoded = (location.x * GameConstants.MAP_MAX_HEIGHT + location.y) * TIMESTAMP_GRANULARITY + timestamp + 1;
+            rc.writeSharedArray(index, encoded);
+        }
     }
 
     private static MapLocation readInterestingLocationWithCoarseExpiry(int index) throws GameActionException {

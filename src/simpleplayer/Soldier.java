@@ -44,8 +44,17 @@ public class Soldier {
         MapLocation[] enemyArchonLocations = Communication.readEnemyArchonLocations();
         MapLocation closest = null;
         int closestDist = Integer.MAX_VALUE;
-        for (MapLocation loc : enemyArchonLocations) {
+        for (int i=0; i < enemyArchonLocations.length; ++i) {
+            MapLocation loc = enemyArchonLocations[i];
+            if (loc == null) {
+                continue;
+            }
             int distsq = loc.distanceSquaredTo(locAtStartOfTurn);
+            if (distsq <= myType.visionRadiusSquared) {
+                // we should have seen it by this point. let everyone else know it's gone.
+                Communication.clearEnemyArchonLocation(i);
+                continue;
+            }
             if (distsq < closestDist) {
                 closestDist = distsq;
                 closest = loc;
