@@ -52,37 +52,22 @@ public class Archon {
 
         int[] unitCounts = Communication.getLastTurnUnitCount();
 
-        int TARGET_MINERS_PER_QUADRANT = 5;
-        int numQuadrants = 0;
+        int TARGET_NEARBY_MINERS = 20;
         int x = locAtStartOfTurn.x;
         int y = locAtStartOfTurn.y;
         int widthm1 = rc.getMapWidth() - 1;
         int heightm1 = rc.getMapHeight() - 1;
-        boolean away_from_left = x * x >= myType.visionRadiusSquared;
-        boolean away_from_bot = y * y >= myType.visionRadiusSquared;
-        boolean away_from_right = (x - widthm1) * (x - widthm1) >= myType.visionRadiusSquared;
-        boolean away_from_top = (y - heightm1) * (y - heightm1) >= myType.visionRadiusSquared;
-        if (away_from_left) {
-            if (away_from_bot) {
-                numQuadrants += 1;
-            }
-            if (away_from_top) {
-                numQuadrants += 1;
-            }
-        }
-        if (away_from_right) {
-            if (away_from_bot) {
-                numQuadrants += 1;
-            }
-            if (away_from_top) {
-                numQuadrants += 1;
-            }
-        }
-        if (numQuadrants == 0) {
-            numQuadrants = 1;
-        }
+        int visionRadius = Util.sqrt(myType.visionRadiusSquared);
+        int xBelow = Math.max(0, x - visionRadius);
+        int yBelow = Math.max(0, y - visionRadius);
+        int xAbove = Math.min(widthm1, x + visionRadius);
+        int yAbove = Math.min(heightm1, y + visionRadius);
+        double areaNearby = (xAbove - xBelow + 1) * (yAbove - yBelow + 1);
+        // This isn't quite right, because we're slicing circles, but it's a rule of thumb for building miners.
+        double visionDiameter = 2 * visionRadius + 1;
+        double fractionOfArableLand = areaNearby / (visionDiameter * visionDiameter);
 
-        if (numNearbyArchons == 0 && numNearbyAttackers == 0 && numNearbyMiners < TARGET_MINERS_PER_QUADRANT * numQuadrants) {
+        if (numNearbyArchons == 0 && numNearbyAttackers == 0 && numNearbyMiners < TARGET_NEARBY_MINERS * fractionOfArableLand) {
             // No attackers nearby. Should probably farm economy
             if (effectiveNumNearbyLeadWorkersNeeded <= numNearbyMiners && numSacrificialBuildersBuilt < 10) {
                 // need to be creative, seems nothing good is nearby
