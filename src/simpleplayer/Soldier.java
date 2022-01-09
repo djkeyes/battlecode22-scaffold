@@ -44,7 +44,7 @@ public class Soldier {
         MapLocation[] enemyArchonLocations = Communication.readEnemyArchonLocations();
         MapLocation closest = null;
         int closestDist = Integer.MAX_VALUE;
-        for (int i=0; i < enemyArchonLocations.length; ++i) {
+        for (int i = 0; i < enemyArchonLocations.length; ++i) {
             MapLocation loc = enemyArchonLocations[i];
             if (loc == null) {
                 continue;
@@ -137,7 +137,6 @@ public class Soldier {
         double minThreatHealth = Double.MAX_VALUE;
         double highestAtk = 0;
         MapLocation weakestThreat = null;
-        boolean canWeOutrangeAnyThreats = false;
         for (RobotInfo enemy : nearbyEnemies) {
             if (enemy.type == RobotType.ARCHON || enemy.type == RobotType.LABORATORY || enemy.type == RobotType.MINER || enemy.type == RobotType.BUILDER) {
                 continue;
@@ -147,10 +146,6 @@ public class Soldier {
                 numCanShootUs++;
 
                 highestAtk = Math.max(highestAtk, enemy.type.getDamage(enemy.level));
-
-                if (!canWeOutrangeAnyThreats && atkRangeSq >= enemy.type.actionRadiusSquared) {
-                    canWeOutrangeAnyThreats = true;
-                }
 
                 if (distSq <= atkRangeSq) {
                     double health = enemy.health;
@@ -190,13 +185,8 @@ public class Soldier {
                     // pick one that's an immediate threat
                     if (rc.isActionReady()) {
                         rc.attack(weakestThreat);
-                    } else if (canWeOutrangeAnyThreats) {
-                        // if we're on cooldown, we can still move
-                        // for every unit
-                        if (rc.isMovementReady()) {
-                            retreat(rc, nearbyEnemies);
-                        }
                     }
+                    // TODO: maybe retreat here, to lure them in?
                     return;
                 } else {
                     if (rc.isActionReady()) {
@@ -207,12 +197,22 @@ public class Soldier {
                         }
                         if (weakestLoc != null) {
                             pathfinder.move(weakestLoc);
+                            weakest = getWeakestInRange(locAfterMovement, nearbyEnemies);
+                            if (weakest != null) {
+                                rc.attack(weakest.location);
+                            }
                         }
                     }
                     return;
                 }
             } else {
                 // retreat
+                if (rc.isActionReady()) {
+                    RobotInfo weakest = getWeakestInRange(curLoc, nearbyEnemies);
+                    if (weakest != null) {
+                        rc.attack(weakest.location);
+                    }
+                }
                 if (rc.isMovementReady()) {
                     retreat(rc, nearbyEnemies);
                 }
@@ -242,6 +242,9 @@ public class Soldier {
                             // few allies, be careful
                             // TODO: in this situation, be cautious
                             pathfinder.move(weakestLoc);
+                        }
+                        if (rc.isActionReady() && locAfterMovement.distanceSquaredTo(weakestLoc) < myType.actionRadiusSquared) {
+                            rc.attack(weakest.location);
                         }
                     }
                 }
