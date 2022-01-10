@@ -8,33 +8,63 @@ public class Archon {
 
     private static int numSacrificialBuildersBuilt = 0;
 
+    private static int[] unitCounts;
+
     public static void runArchon() throws GameActionException {
 
         Communication.clearUnitCounts();
+
+        checkUnderAttack();
+
+        unitCounts = Communication.getLastTurnUnitCount();
 
         if (!rc.isActionReady()) {
             return;
         }
 
-        int numNearbyAttackers = 0;
-        int numNearbyArchons = 0;
+
+        if (areWeUnderAttackAndShouldGiveUp) {
+            tryHealingNearbyUnits();
+            return;
+        }
+        if (areWeUnderAttack) {
+            if (areWeUnderAttackAndWinning) {
+                if (anyOtherArchonsNeedMoney && ourLead < (RobotType.SOLDIER.buildCostLead + RobotType.MINER.buildCostLead)) {
+                    // let the other archons have the money
+                    tryHealingNearbyUnits();
+                    return;
+                } else {
+                    // follow normal build order
+                    handleNormalBuildOrder();
+                    tryHealingNearbyUnits();
+                    return;
+                }
+            } else {
+                handleUnderAttackBuildOrder();
+                tryHealingNearbyUnits();
+                return;
+            }
+        } else {
+            // follow normal build order
+            handleNormalBuildOrder();
+            tryHealingNearbyUnits();
+            return;
+        }
+
+
+    }
+
+    private static void handleNormalBuildOrder() throws GameActionException {
+
         int numNearbyMiners = 0;
-        int numNearbyLead = 0;
         int effectiveNumNearbyLeadWorkersNeeded = 0;
         for (RobotInfo r : visibleAllies) {
             if (r.type == RobotType.MINER) {
                 ++numNearbyMiners;
             }
         }
-        for (RobotInfo r : visibleEnemies) {
-            if (r.type.canAttack()) {
-                ++numNearbyAttackers;
-            } else if (r.type == RobotType.ARCHON) {
-                ++numNearbyArchons;
-            }
-        }
         MapLocation[] leadLocations = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
-        numNearbyLead = leadLocations.length;
+        int numNearbyLead = leadLocations.length;
         for (MapLocation location : leadLocations) {
             int lead = rc.senseLead(location);
             // some tiles are practically infinite, so we can't mine them all in one game.
@@ -49,8 +79,6 @@ public class Archon {
         // estimate of the number of tiles a single worker can manage. tunable.
         final int TILES_MANTAINED_BY_WORKER_PER_TURN = 5;
         effectiveNumNearbyLeadWorkersNeeded += (numNearbyLead + 4) / TILES_MANTAINED_BY_WORKER_PER_TURN;
-
-        int[] unitCounts = Communication.getLastTurnUnitCount();
 
         int TARGET_NEARBY_MINERS = 20;
         int x = locAtStartOfTurn.x;
@@ -67,8 +95,8 @@ public class Archon {
         double visionDiameter = 2 * visionRadius + 1;
         double fractionOfArableLand = areaNearby / (visionDiameter * visionDiameter);
 
-        if (numNearbyArchons == 0 && numNearbyAttackers == 0 && numNearbyMiners < TARGET_NEARBY_MINERS * fractionOfArableLand) {
-            // No attackers nearby. Should probably farm economy
+        if (numNearbyMiners < TARGET_NEARBY_MINERS * fractionOfArableLand) {
+            // Farm economy
             if (effectiveNumNearbyLeadWorkersNeeded <= numNearbyMiners && numSacrificialBuildersBuilt < 10) {
                 // need to be creative, seems nothing good is nearby
                 // build a builder to grow a lead mine
@@ -93,8 +121,8 @@ public class Archon {
                 }
             }
         } else {
-            // There are attackers nearby. Build workers if it's necessary to bootstrap, otherwise soldiers
-            if (rc.getRoundNum() < 10 && (unitCounts[RobotType.MINER.ordinal()] < 5 || numNearbyMiners < effectiveNumNearbyLeadWorkersNeeded + 1)) {
+            // Build workers if it's necessary to bootstrap, otherwise soldiers
+            if (rc.getRoundNum() < 10 && (unitCounts[RobotType.MINER.ordinal()] < 2 || numNearbyMiners < effectiveNumNearbyLeadWorkersNeeded + 1)) {
                 // build workers
                 if (RobotType.MINER.buildCostLead <= ourLead) {
                     for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
@@ -116,30 +144,47 @@ public class Archon {
                 }
             }
         }
+    }
 
-
-        tryHealingNearbyUnits();
+    private static void handleUnderAttackBuildOrder() throws GameActionException {
+        // There are attackers nearby. Build workers if it's necessary to bootstrap, otherwise soldiers
+        if (rc.getRoundNum() < 10 || (unitCounts[RobotType.MINER.ordinal()] < 2 * archonCount)) {
+            // build workers
+            if (RobotType.MINER.buildCostLead <= ourLead) {
+                for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+                    if (rc.canBuildRobot(RobotType.MINER, d)) {
+                        rc.buildRobot(RobotType.MINER, d);
+                        return;
+                    }
+                }
+            }
+        } else {
+            // build soldiers
+            if (RobotType.SOLDIER.buildCostLead <= ourLead) {
+                for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+                    if (rc.canBuildRobot(RobotType.SOLDIER, d)) {
+                        rc.buildRobot(RobotType.SOLDIER, d);
+                        return;
+                    }
+                }
+            }
+        }
     }
 
     private static void tryHealingNearbyUnits() throws GameActionException {
+        if (!rc.isActionReady()) {
+            return;
+        }
         RobotInfo[] nearbyAllies = actableAllies;
         RobotInfo weakestCombatUnit = null;
         int weakestCombatUnitHp = Integer.MAX_VALUE;
         RobotInfo weakestNoncombatUnit = null;
         int weakestNonCombatUnitHp = Integer.MAX_VALUE;
-        //RobotInfo weakestArchon = null;
-        //int weakestArchonHp = Integer.MAX_VALUE;
         for (RobotInfo ally : nearbyAllies) {
             RobotType allyType = ally.getType();
             if (ally.health == allyType.getMaxHealth(ally.level)) {
                 continue;
             }
-            /*if (allyType == RobotType.ARCHON) {
-                if (ally.health < weakestArchonHp) {
-                    weakestArchon = ally;
-                    weakestArchonHp = ally.health;
-                }
-            } else */
             if (allyType.canAttack()) {
                 if (ally.health < weakestCombatUnitHp) {
                     weakestCombatUnit = ally;
@@ -152,13 +197,85 @@ public class Archon {
                 }
             }
         }
-        /*if (weakestArchon != null) {
-            rc.repair(weakestArchon.location);
-        } else*/
         if (weakestCombatUnit != null) {
             rc.repair(weakestCombatUnit.location);
         } else if (weakestNoncombatUnit != null) {
             rc.repair(weakestNoncombatUnit.location);
+        }
+    }
+
+    private static boolean areWeUnderAttack = false;
+    private static boolean areWeUnderAttackAndWinning = false;
+    private static boolean areWeUnderAttackAndShouldGiveUp = false;
+    private static boolean anyOtherArchonsNeedMoney = false;
+
+    private static void checkUnderAttack() throws GameActionException {
+        Communication.cacheArchonsUnderAttack();
+
+        int numFriendlyAttackers = 0;
+        for (int i = 0; i < visibleAllies.length; ++i) {
+            if (visibleAllies[i].type.canAttack()) {
+                ++numFriendlyAttackers;
+            }
+        }
+        int numEnemyAttackers = 0;
+        int netEnemyDamagePerTurn = 0;
+        for (int i = 0; i < visibleEnemies.length; ++i) {
+            RobotInfo enemy = visibleEnemies[i];
+            RobotType enemyType = enemy.type;
+            if (enemyType.canAttack()) {
+                ++numEnemyAttackers;
+                netEnemyDamagePerTurn += enemy.type.getDamage(enemy.level);
+            } else if (enemyType == RobotType.ARCHON && rc.getRoundNum() > 2) {
+                ++numEnemyAttackers;
+            }
+        }
+
+        boolean anyOtherArchonsOkay = false;
+        for (int i = rc.getArchonCount(); --i >= 0; ) {
+            if (i == Communication.myArchonIndex) {
+                continue;
+            }
+            if (!Communication.readArchonUnderAttack(i)) {
+                anyOtherArchonsOkay = true;
+            }
+            if (Communication.readArchonNeedsMoneyForSoldier(i)) {
+                anyOtherArchonsNeedMoney = true;
+            }
+        }
+
+        areWeUnderAttack = numEnemyAttackers > 0;
+
+        areWeUnderAttackAndWinning = false;
+        areWeUnderAttackAndShouldGiveUp = false;
+        if (areWeUnderAttack) {
+            // If we're winning decicively, just broadcast information. If other archons are under attack, they might
+            // choose to take preference for resources.
+            // If we're severely outnumbered, and other archons might have a better chance, so store a flag to mark
+            // that we should give up.
+
+
+            if (numFriendlyAttackers >= 2 * numEnemyAttackers) {
+                areWeUnderAttackAndWinning = true;
+            } else {
+                if (numFriendlyAttackers <= 2 && netEnemyDamagePerTurn >= RobotType.SOLDIER.health) {
+                    // they can 1-shot soldiers, so probably not worth fighting here.
+                    // TODO: retreat if there's an exit.
+                    if (rc.getArchonCount() > 1) {
+                        if (anyOtherArchonsOkay) {
+                            areWeUnderAttackAndShouldGiveUp = true;
+                        }
+                    }
+                }
+            }
+
+            if (!Communication.readArchonUnderAttack(Communication.myArchonIndex) || (Communication.readArchonNeedsMoneyForSoldier(Communication.myArchonIndex) == areWeUnderAttackAndShouldGiveUp)) {
+                Communication.writeArchonUnderAttack(true, !areWeUnderAttackAndShouldGiveUp);
+            }
+        } else {
+            if (Communication.readArchonUnderAttack(Communication.myArchonIndex) || Communication.readArchonNeedsMoneyForSoldier(Communication.myArchonIndex)) {
+                Communication.writeArchonUnderAttack(false, false);
+            }
         }
     }
 }

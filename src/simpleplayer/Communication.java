@@ -28,6 +28,8 @@ public class Communication {
     private static final int ENEMY_ARCHON_INDEX_LENGTH = 4;
     private static final int UNIT_COUNT_OFFSET = ENEMY_ARCHON_INDEX_OFFSET + ENEMY_ARCHON_INDEX_LENGTH;
     private static final int UNIT_COUNT_LENGTH = 14;
+    private static final int ARCHON_UNDER_ATTACK_OFFSET = UNIT_COUNT_OFFSET + UNIT_COUNT_LENGTH;
+    private static final int ARCHON_UNDER_ATTACK_LENGTH = 1;
 
     public static int myArchonIndex = -1;
 
@@ -68,6 +70,41 @@ public class Communication {
             result[tail] = a3;
         }
         return result;
+    }
+
+
+    private static final int SAVING_FOR_SOLDIER_OFFSET = 4;
+
+    public static void writeArchonUnderAttack(boolean amIUnderAttack, boolean amISavingForSoldier) throws GameActionException {
+        if (myArchonIndex == -1) {
+            initArchonIndex();
+        }
+        int archonsUnderAttack = rc.readSharedArray(ARCHON_UNDER_ATTACK_OFFSET);
+        if (amIUnderAttack) {
+            archonsUnderAttack = (archonsUnderAttack | (1 << myArchonIndex));
+        } else {
+            archonsUnderAttack = (archonsUnderAttack & ~(1 << myArchonIndex));
+        }
+        if (amISavingForSoldier) {
+            archonsUnderAttack = (archonsUnderAttack | (1 << (myArchonIndex + SAVING_FOR_SOLDIER_OFFSET)));
+        } else {
+            archonsUnderAttack = (archonsUnderAttack & ~(1 << (myArchonIndex + SAVING_FOR_SOLDIER_OFFSET)));
+        }
+        rc.writeSharedArray(ARCHON_UNDER_ATTACK_OFFSET, archonsUnderAttack);
+    }
+
+    private static int cachedArchonsUnderAttack;
+
+    public static void cacheArchonsUnderAttack() throws GameActionException {
+        cachedArchonsUnderAttack = rc.readSharedArray(ARCHON_UNDER_ATTACK_OFFSET);
+    }
+
+    public static boolean readArchonUnderAttack(int index) throws GameActionException {
+        return (cachedArchonsUnderAttack & (1 << index)) > 0;
+    }
+
+    public static boolean readArchonNeedsMoneyForSoldier(int index) throws GameActionException {
+        return (cachedArchonsUnderAttack & (1 << (index + SAVING_FOR_SOLDIER_OFFSET))) > 0;
     }
 
     public static void writeEnemyArchonLocation(RobotInfo enemyArchon) throws GameActionException {
@@ -180,7 +217,7 @@ public class Communication {
                 return;
             }
         }
-        for (int i=0; i < 7; ++i) {
+        for (int i = 0; i < 7; ++i) {
             rc.writeSharedArray(UNIT_COUNT_OFFSET + curOffset + i, 0);
         }
     }
