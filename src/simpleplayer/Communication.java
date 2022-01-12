@@ -112,7 +112,7 @@ public class Communication {
         // to alternate between teams (might be a quirk of the map generator). This means we can easily hash enemy
         // archons to unique ids in [0,3].
         // TODO: might want to check if this has already been stored, otherwise the write is a waste.
-        int enemyArchonIndex = enemyArchon.ID / 2 - 1;
+        int enemyArchonIndex = (enemyArchon.ID / 2 - 1) % 4;
         writeInterestingLocationWithCoarseExpiry(ENEMY_ARCHON_INDEX_OFFSET + enemyArchonIndex, enemyArchon.location);
     }
 
