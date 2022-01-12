@@ -713,6 +713,29 @@ public final strictfp class RobotPlayer {
         expected = 3;
         actual = after - before;
         assertEquals(expected, actual);
+
+        // Seems like static initialization happens the first time you access the class
+        before = Clock.getBytecodeNum();
+        AnotherClassWithManyStaticVariables.x = 42;
+        after = Clock.getBytecodeNum();
+        expected = 16;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        AnotherClassWithManyStaticVariables.x = 700;
+        after = Clock.getBytecodeNum();
+        expected = 3;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int calculation = AnotherClassWithStaticInitialization.numOddNumbersBelow10;
+        after = Clock.getBytecodeNum();
+        assertEquals(5, calculation);
+        expected = 131;
+        actual = after - before;
+        assertEquals(expected, actual);
     }
 
     private static void debug_noop() {
