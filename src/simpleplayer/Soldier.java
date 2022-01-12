@@ -186,7 +186,7 @@ public class Soldier {
                     if (rc.isActionReady()) {
                         rc.attack(weakestThreat);
                     }
-                    // TODO: maybe retreat here, to lure them in?
+                    reposition(locAtStartOfTurn.directionTo(weakestThreat).opposite());
                     return;
                 } else {
                     if (rc.isActionReady()) {
@@ -254,27 +254,87 @@ public class Soldier {
         }
     }
 
+    private static void reposition(Direction back)
+            throws GameActionException {
+        // reposition to a place with better rubble
+        // prefer to sidestrafe, and then to move backwards
+        if (!rc.isMovementReady()) {
+            return;
+        }
+        Direction backLeft = back.rotateLeft();
+        Direction left = backLeft.rotateLeft();
+        Direction backRight = back.rotateLeft();
+        Direction right = backRight.rotateRight().rotateRight();
+
+        int curRubble = rc.senseRubble(locAtStartOfTurn);
+
+        MapLocation leftLoc = locAtStartOfTurn.add(left);
+        int leftRubble = rc.canSenseLocation(leftLoc) ? rc.senseRubble(leftLoc) : 101;
+        MapLocation rightLoc = locAtStartOfTurn.add(right);
+        int rightRubble = rc.canSenseLocation(rightLoc) ? rc.senseRubble(rightLoc) : 101;
+        if (leftRubble < curRubble || rightRubble < curRubble) {
+            if (leftRubble < rightRubble) {
+                rc.move(left);
+                return;
+            } else {
+                rc.move(right);
+                return;
+            }
+        }
+
+        leftLoc = locAtStartOfTurn.add(backLeft);
+        leftRubble = rc.canSenseLocation(leftLoc) ? rc.senseRubble(leftLoc) : 101;
+        rightLoc = locAtStartOfTurn.add(backRight);
+        rightRubble = rc.canSenseLocation(rightLoc) ? rc.senseRubble(rightLoc) : 101;
+        if (leftRubble < curRubble || rightRubble < curRubble) {
+            if (leftRubble < rightRubble) {
+                rc.move(backLeft);
+                return;
+            } else {
+                rc.move(backRight);
+                return;
+            }
+        }
+
+        MapLocation backLoc = locAtStartOfTurn.add(back);
+        int backRubble = rc.canSenseLocation(backLoc) ? rc.senseRubble(backLoc) : 101;
+        if (backRubble < curRubble) {
+            rc.move(backLeft);
+        }
+
+
+    }
+
     private static boolean retreat(RobotController rc, RobotInfo[] nearbyEnemies)
             throws GameActionException {
         MapLocation curLoc = rc.getLocation();
         boolean[] isAwayFromEnemy = Directions.dirsAwayFrom(nearbyEnemies, curLoc);
 
         Direction dirToMove = null;
+        int lowestSafeRubble = 101;
         Direction unsafeDirToMove = null;
+        int lowestUnsafeRubble = 101;
         int dirLen = Directions.RANDOM_DIRECTION_PERMUTATION.length;
         int start = gen.nextInt(dirLen);
         int i = start;
         do {
             Direction d = Directions.RANDOM_DIRECTION_PERMUTATION[i];
-            if (isAwayFromEnemy[Directions.dirToInt(d)]) {
-                if (rc.canMove(d)) {
-                    // if there's a free spot, take advantage of it
-                    // immediately
-                    dirToMove = d;
-                    break;
+            MapLocation next = locAtStartOfTurn.add(d);
+            if (rc.onTheMap(next)) {
+                int rubbleAmount = rc.senseRubble(next);
+                if (isAwayFromEnemy[Directions.dirToInt(d)]) {
+                    if (rc.canMove(d)) {
+                        if (rubbleAmount < lowestSafeRubble) {
+                            lowestSafeRubble = rubbleAmount;
+                            dirToMove = d;
+                        }
+                    }
+                } else if (unsafeDirToMove == null && rc.canMove(d)) {
+                    if (rubbleAmount < lowestUnsafeRubble) {
+                        lowestUnsafeRubble = rubbleAmount;
+                        unsafeDirToMove = d;
+                    }
                 }
-            } else if (unsafeDirToMove == null && rc.canMove(d)) {
-                unsafeDirToMove = d;
             }
 
             i = (i + 1) % dirLen;
