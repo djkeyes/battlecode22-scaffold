@@ -265,6 +265,26 @@ public class Miner {
         return numTilesAssignedToUs;
     }
 
+    private static MapLocation findClosestFighter() {
+        int closestDistSq = Integer.MAX_VALUE;
+        MapLocation closest = null;
+        for (int i = visibleAllies.length; --i >= 0; ) {
+            RobotInfo ally = visibleAllies[i];
+            if (!ally.type.canAttack()) {
+                continue;
+            }
+            if (ally.type == RobotType.WATCHTOWER && ally.mode != RobotMode.PORTABLE) {
+                continue;
+            }
+            int distSq = locAfterMovement.distanceSquaredTo(ally.location);
+            if (distSq < closestDistSq) {
+                closestDistSq = distSq;
+                closest = ally.location;
+            }
+        }
+        return closest;
+    }
+
     public static void runMiner() throws GameActionException {
         nearbyLead = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
         nearbyGold = rc.senseNearbyLocationsWithGold(myType.visionRadiusSquared);
@@ -350,26 +370,32 @@ public class Miner {
         //int after2 = Clock.getBytecodeNum();
         //System.out.println("bcs to find nearest resources: " + (after2 - before2));
 
-        // travel to nearest resource
+        tryMiningAdjacentTiles();
+
+        // continue to travel to last target
+        // if we're already there, look for somewhere new to go
         if (lastTargetMiningLocation != null && locAtStartOfTurn.distanceSquaredTo(lastTargetMiningLocation) <= 2) {
             lastTargetMiningLocation = null;
         }
-        if (closestResource != null) {
-            lastTargetMiningLocation = closestResource;
+        // alternatively, if we have a better target, try visiting it
+        MapLocation newTargetMiningLocation = null;
+        if (closestResource != null && (rc.senseLead(closestResource) > 1 || rc.senseGold(closestResource) > 0)) {
+            newTargetMiningLocation = closestResource;
+        }
+        if (newTargetMiningLocation == null && secondClosestResource != null
+                && (rc.senseLead(secondClosestResource) > 1 || rc.senseGold(secondClosestResource) > 0)) {
+            // if we mined out, go somewhere new
+            newTargetMiningLocation = secondClosestResource;
+        }
+        if (newTargetMiningLocation == null) {
+            // try following a fighter, will probably find rubble to loot
+            newTargetMiningLocation = findClosestFighter();
+        }
+        if (newTargetMiningLocation != null) {
+            lastTargetMiningLocation = newTargetMiningLocation;
         }
         if (lastTargetMiningLocation == null) {
-            // pick somewhere at random and move towards it
-            lastTargetMiningLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
-        }
-
-        tryMiningAdjacentTiles();
-
-        // if we mined out, go somewhere new
-        if (lastTargetMiningLocation == null && secondClosestResource != null) {
-            lastTargetMiningLocation = secondClosestResource;
-        }
-        if (lastTargetMiningLocation == null) {
-            // pick somewhere at random and move towards it
+            // If we just reset, and we don't have an override, pick somewhere at random and move towards it
             lastTargetMiningLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
         }
 
@@ -381,20 +407,12 @@ public class Miner {
     }
 
     private static void tryMiningAdjacentTiles() throws GameActionException {
-        MapLocation target = lastTargetMiningLocation;
-        boolean areWeAtTarget = lastTargetMiningLocation != null && locAfterMovement.distanceSquaredTo(target) <= myType.actionRadiusSquared;
-        if (!areWeAtTarget) {
-            // just check the nearby stuff. we're not at the destination yet.
-            target = locAfterMovement;
-        }
+        MapLocation target = locAfterMovement;
         int dx = -1, dy = -1;
         while (rc.isActionReady()) {
             if (target == null) {
-                // need to pathfind somewhere new
-                if (areWeAtTarget) {
-                    lastTargetMiningLocation = null;
-                }
-                break;
+                // need to pathfind somewhere new, no more resources
+                return;
             }
 
             int goldLeft = rc.senseGold(target);
@@ -411,8 +429,8 @@ public class Miner {
             if (goldLeft == 0 && leadLeft < MIN_LEAD_AMOUNT) {
                 target = null;
             } else {
-                // on action cooldown
-                break;
+                // on action cooldown, but there might be more resources left
+                return;
             }
 
             // see if anything adjacent to us still has resources
