@@ -37,7 +37,7 @@ import static bytecodes.Assert.assertEquals;
  */
 public final strictfp class RobotPlayer {
 
-    public static void runTests(final RobotController rc) {
+    public static void runTests(final RobotController rc) throws GameActionException {
         testSimpleAssertion();
         timeNoop();
         timeDeclarePrimitive();
@@ -72,12 +72,15 @@ public final strictfp class RobotPlayer {
         timeMapLocationMethods(rc);
         time2DArrayOptions();
         Clock.yield();
+
+        testMapProcessingMethods(rc);
     }
 
     @SuppressWarnings("unused")
     public static void run(RobotController rc) {
         // TODO(daniel): it would be nice to test the cost of static initialization
         final int bytecodesAtStart = Clock.getBytecodeNum();
+        // surprisingly, this prints 0. Do we get static of private inner classes initialization for free?
         System.out.println("bytecodes at start of tests: " + bytecodesAtStart);
         final int bytecodesAfterPrint = Clock.getBytecodeNum();
         assertEquals(9, bytecodesAfterPrint - bytecodesAtStart);
@@ -1605,6 +1608,321 @@ public final strictfp class RobotPlayer {
         // this actually gives us two blocks. in reality, we would then sometimes need to shift the result by 32 bits
         after = Clock.getBytecodeNum();
         expected = 11;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+    }
+
+    private static class NearLocationsObject {
+        public static MapLocation l00;
+        public static int r00;
+
+        public static MapLocation l01;
+        public static int r01;
+        public static MapLocation l10;
+        public static int r10;
+        public static MapLocation l0m1;
+        public static int r0m1;
+        public static MapLocation lm10;
+        public static int rm10;
+
+        public static MapLocation l11;
+        public static int r11;
+        public static MapLocation lm11;
+        public static int rm11;
+        public static MapLocation lm1m1;
+        public static int rm1m1;
+        public static MapLocation l1m1;
+        public static int r1m1;
+
+        public static MapLocation l02;
+        public static int r02;
+        public static MapLocation l20;
+        public static int r20;
+        public static MapLocation l0m2;
+        public static int r0m2;
+        public static MapLocation lm20;
+        public static int rm20;
+
+        public void init(RobotController rc) throws GameActionException {
+            l00 = rc.getLocation();
+            l01 = l00.add(Direction.NORTH);
+            l10 = l01.add(Direction.SOUTHEAST);
+            l0m1 = l10.add(Direction.SOUTHWEST);
+            lm10 = l0m1.add(Direction.NORTHWEST);
+
+            l11 = l01.add(Direction.EAST);
+            lm11 = l01.add(Direction.WEST);
+            lm1m1 = l0m1.add(Direction.WEST);
+            l1m1 = l0m1.add(Direction.EAST);
+
+            l02 = l01.add(Direction.NORTH);
+            l20 = l10.add(Direction.EAST);
+            l0m2 = l0m1.add(Direction.SOUTH);
+            lm20 = lm10.add(Direction.WEST);
+
+            r00 = 1000;
+            r01 = 1000;
+            r10 = 1000;
+            r0m1 = 1000;
+            rm10 = 1000;
+            r11 = 1000;
+            rm11 = 1000;
+            rm1m1 = 1000;
+            r1m1 = 1000;
+            r02 = 1000;
+            r20 = 1000;
+            r0m2 = 1000;
+            rm20 = 1000;
+
+            // onTheMap() is map dependent, so we apply `|| true` to make these tests deterministic
+            // of course, as a result, senseRubble doesn't always work, so we only feed in l00, since that's
+            // guaranteed to be on the map.
+            if (rc.onTheMap(l00) || true) {
+                r00 = rc.senseRubble(l00);
+            }
+
+            if (rc.onTheMap(l01) || true) {
+                r01 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(l10) || true) {
+                r10 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(l0m1) || true) {
+                r0m1 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(lm10) || true) {
+                rm10 = rc.senseRubble(l00);
+            }
+
+            if (rc.onTheMap(l11) || true) {
+                r11 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(lm11) || true) {
+                rm11 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(lm1m1) || true) {
+                rm1m1 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(l1m1) || true) {
+                r1m1 = rc.senseRubble(l00);
+            }
+
+            if (rc.onTheMap(l02) || true) {
+                r02 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(l20) || true) {
+                r20 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(l0m2) || true) {
+                r0m2 = rc.senseRubble(l00);
+            }
+            if (rc.onTheMap(lm20) || true) {
+                rm20 = rc.senseRubble(l00);
+            }
+        }
+
+        public void init2(RobotController rc) throws GameActionException {
+            l00 = rc.getLocation();
+            l01 = l00.add(Direction.NORTH);
+            l10 = l01.add(Direction.SOUTHEAST);
+            l0m1 = l10.add(Direction.SOUTHWEST);
+            lm10 = l0m1.add(Direction.NORTHWEST);
+
+            l11 = l01.add(Direction.EAST);
+            lm11 = l01.add(Direction.WEST);
+            lm1m1 = l0m1.add(Direction.WEST);
+            l1m1 = l0m1.add(Direction.EAST);
+
+            l02 = l01.add(Direction.NORTH);
+            l20 = l10.add(Direction.EAST);
+            l0m2 = l0m1.add(Direction.SOUTH);
+            lm20 = lm10.add(Direction.WEST);
+
+            r00 = 1000;
+            r01 = 1000;
+            r10 = 1000;
+            r0m1 = 1000;
+            rm10 = 1000;
+            r11 = 1000;
+            rm11 = 1000;
+            rm1m1 = 1000;
+            r1m1 = 1000;
+            r02 = 1000;
+            r20 = 1000;
+            r0m2 = 1000;
+            rm20 = 1000;
+
+            int width = rc.getMapWidth();
+            int height = rc.getMapHeight();
+
+            // onTheMap() is map dependent, so we apply `|| true` to make these tests deterministic
+            // of course, as a result, senseRubble doesn't always work, so we only feed in l00, since that's
+            // guaranteed to be on the map.
+            r00 = rc.senseRubble(l00);
+
+            // substituting a boolean in here like `boolean x1ltw = l10.x < width;` doesn't really help.
+            // But maybe if there were a lot more entries with the value dx=1, it might give a speedup. Or maybe not.
+
+            if (l01.y < height || true) {
+                r01 = rc.senseRubble(l00);
+            }
+            if (l10.x < width || true) {
+                r10 = rc.senseRubble(l00);
+            }
+            if (l0m1.y >= 0 || true) {
+                r0m1 = rc.senseRubble(l00);
+            }
+            if (lm10.x >= 0 || true) {
+                rm10 = rc.senseRubble(l00);
+            }
+
+            if ((l11.x < width && l11.y < height) || true) {
+                r11 = rc.senseRubble(l00);
+            }
+            if ((lm11.x >= 0 && lm11.y < height) || true) {
+                rm11 = rc.senseRubble(l00);
+            }
+            if ((lm1m1.x >= 0 && lm1m1.y >= 0) || true) {
+                rm1m1 = rc.senseRubble(l00);
+            }
+            if ((l1m1.x < width && l1m1.y >= 0) || true) {
+                r1m1 = rc.senseRubble(l00);
+            }
+
+            if (l02.y < height || true) {
+                r02 = rc.senseRubble(l00);
+            }
+            if (l20.x < width || true) {
+                r20 = rc.senseRubble(l00);
+            }
+            if (l0m2.y >= 0 || true) {
+                r0m2 = rc.senseRubble(l00);
+            }
+            if (lm20.x >= 0 || true) {
+                rm20 = rc.senseRubble(l00);
+            }
+        }
+
+        void initWithSenseLocations(RobotController rc) throws GameActionException {
+            MapLocation[] nearby = rc.getAllLocationsWithinRadiusSquared(rc.getLocation(), 4);
+            MapLocation myLoc = rc.getLocation();
+
+            r00 = 1000;
+            r01 = 1000;
+            r10 = 1000;
+            r0m1 = 1000;
+            rm10 = 1000;
+            r11 = 1000;
+            rm11 = 1000;
+            rm1m1 = 1000;
+            r1m1 = 1000;
+            r02 = 1000;
+            r20 = 1000;
+            r0m2 = 1000;
+            rm20 = 1000;
+
+            int myX = myLoc.x;
+            int myY = myLoc.y;
+            for (int i = nearby.length; --i >= 0; ) {
+                MapLocation loc = nearby[i];
+                switch (loc.x - myX) {
+                    case -2:
+                        rm20 = rc.senseRubble(l00);
+                        break;
+                    case -1:
+                        switch (loc.y - myY) {
+                            case -1:
+                                rm1m1 = rc.senseRubble(l00);
+                                break;
+                            case 0:
+                                rm10 = rc.senseRubble(l00);
+                                break;
+                            case 1:
+                                rm11 = rc.senseRubble(l00);
+                                break;
+                        }
+                        break;
+                    case 0:
+                        switch (loc.y - myY) {
+                            case -2:
+                                r0m2 = rc.senseRubble(l00);
+                                break;
+                            case -1:
+                                rm10 = rc.senseRubble(l00);
+                                break;
+                            case 0:
+                                r00 = rc.senseRubble(l00);
+                                break;
+                            case 1:
+                                r10 = rc.senseRubble(l00);
+                                break;
+                            case 2:
+                                r02 = rc.senseRubble(l00);
+                                break;
+                        }
+                        break;
+                    case 1:
+                        switch (loc.y - myY) {
+                            case -1:
+                                r1m1 = rc.senseRubble(l00);
+                                break;
+                            case 0:
+                                r10 = rc.senseRubble(l00);
+                                break;
+                            case 1:
+                                r11 = rc.senseRubble(l00);
+                                break;
+                        }
+                        break;
+                    case 2:
+                        r20 = rc.senseRubble(l00);
+                        break;
+                }
+            }
+        }
+    }
+
+    private static void testMapProcessingMethods(RobotController rc) throws GameActionException {
+
+        int expected, actual;
+        int before, after;
+
+        before = Clock.getBytecodeNum();
+        NearLocationsObject obj = new NearLocationsObject();
+        after = Clock.getBytecodeNum();
+        expected = 9;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        obj.init(rc);
+        after = Clock.getBytecodeNum();
+        expected = 301;
+        actual = after - before;
+        assertEquals(expected, actual);
+        // if I comment out the on-the-map checks, I get 197. So the cost of those is
+        // (301 - 197) / 13 = 8 per check.
+        // for a radius of 2, that is 9*8 = 72
+        // for a radius of 13, that is 45*8 = 360
+        // for a radius of 20, that is 9*8 = 552
+        // for a radius of 34, that is 9*8 = 872
+        // So it might be worthwhile to make a specialized version that only when the bot is far from map edges
+        // (and maybe another specialized version that skips some checks when the bot IS near map edges)
+
+        // This seems faster near map boundaries, but slow when we really have to hit the entire for-loop
+        // Commented out because this test is map-dependent
+        /*before = Clock.getBytecodeNum();
+        obj.initWithSenseLocations(rc);
+        after = Clock.getBytecodeNum();
+        expected = 498;
+        actual = after - before;
+        assertEquals(expected, actual);*/
+
+        before = Clock.getBytecodeNum();
+        obj.init2(rc);
+        after = Clock.getBytecodeNum();
+        expected = 259;
         actual = after - before;
         assertEquals(expected, actual);
 
