@@ -100,6 +100,7 @@ public strictfp class RobotPlayer {
                         case LABORATORY:
                             break;
                         case WATCHTOWER:
+                            Watchtower.runWatchtower();
                             break;
                         case BUILDER:
                             Builder.runBuilder();

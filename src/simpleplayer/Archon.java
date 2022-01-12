@@ -101,12 +101,34 @@ public class Archon {
                     }
                 }
             } else {
-                // build soldiers
-                if (RobotType.SOLDIER.buildCostLead <= ourLead) {
-                    for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
-                        if (rc.canBuildRobot(RobotType.SOLDIER, d)) {
-                            rc.buildRobot(RobotType.SOLDIER, d);
-                            return;
+                if (unitCounts[RobotType.SOLDIER.ordinal()] < 20) {
+                    // build soldiers
+                    if (RobotType.SOLDIER.buildCostLead <= ourLead) {
+                        for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+                            if (rc.canBuildRobot(RobotType.SOLDIER, d)) {
+                                rc.buildRobot(RobotType.SOLDIER, d);
+                                return;
+                            }
+                        }
+                    }
+                } else {
+                    if (unitCounts[RobotType.BUILDER.ordinal()] <= 0.25 * Math.min(200, unitCounts[RobotType.WATCHTOWER.ordinal()])) {
+                        // build builders
+                        for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+                            if (rc.canBuildRobot(RobotType.BUILDER, d)) {
+                                rc.buildRobot(RobotType.BUILDER, d);
+                                return;
+                            }
+                        }
+                    } else {
+                        // let the builders build watchtowers. only add other stuff if we're loaded
+                        if (ourLead > RobotType.WATCHTOWER.buildCostLead + RobotType.SOLDIER.buildCostLead) {
+                            for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+                                if (rc.canBuildRobot(RobotType.SOLDIER, d)) {
+                                    rc.buildRobot(RobotType.SOLDIER, d);
+                                    return;
+                                }
+                            }
                         }
                     }
                 }
@@ -151,6 +173,9 @@ public class Archon {
         for (RobotInfo ally : nearbyAllies) {
             RobotType allyType = ally.getType();
             if (ally.health == allyType.getMaxHealth(ally.level)) {
+                continue;
+            }
+            if (allyType.isBuilding()) {
                 continue;
             }
             if (allyType.canAttack()) {
