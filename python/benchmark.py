@@ -19,7 +19,11 @@ build_dir = checkout_dir + 'build/'
 reference_benchmarks = [
     ('examplefuncsplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
     ('simpleplayer', 'cc2802ceabebcd97895b5341bc2bc16bba1eab74', ['']),
-    #('noopplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
+    #('simpleplayer', '3371a0920668c285825598d73d18e08c918be5b4', ['']), # revamped worker assignment
+    #('simpleplayer', 'cd72ddb393348003d6dbc00ea73dbf82e8b3aa46', ['']), # fewer builders
+    #('simpleplayer', '1bd87f22d967d0ef31f60a717a44876143127a46', ['']), # new pathfinding
+    #('simpleplayer', '5ce389b2fb4f61fcc60282d2879a1ec5270c89b5', ['']), # tuned for certain cramped maps
+    ('simpleplayer', 'a63d8992d08e87a9e18c1e10e0b3a4f0f4a1b1a7', ['']), # improved combat
 ]
 
 latest_bots = [
@@ -27,39 +31,66 @@ latest_bots = [
 ]
 
 maps = [
+    # Leadless maps
     'BigEmpty',
     'MediumEmpty',
     'SmallEmpty',
 
+    # small maps
     'InverseGradient',
-    'Mushroom',
-    'Pods',
     '10x10',
-    'Hermits',
     'Gradient',
     'Random',
-    'AllRubble',
-    'BigMoney',
-    'Gladiators',
-    'XenosArrow',
-    'ARiverRunsThroughIt',
-    'Cave',
     'Checkers2',
     'Checkers',
-    'Corridor',
+    'SuddenDeath',
+
+    # close archon start maps
+    'Pods',
+    'Gladiators',
+
+    # medium maps
+    'BigMoney',
     'Hawaii',
     'KingOfTheHill',
+
+    # big maps
+    'Mushroom',
+    'Hermits',
+    'ARiverRunsThroughIt',
+    'Cave',
+    'Corridor',
     'LeadIsHere',
     'Squiggles',
-    'SuddenDeath',
     'Turtle',
     'Desert',
 
+    # gimicky maps
+    'AllRubble',
+    'XenosArrow',
     'HardToPathfind',
 
+    # Official maps
+    'maptestsmall',
+    'colosseum',
+    'eckleburg',
+    'fortress',
+    'intersection',
+    'jellyfish',
+    'maptestsmall',
+    'nottestsmall',
+    'progress',
+    'rivers',
+    'sandwich',
+    'squer',
+    'uncomfortable',
+    'uderground',
+    'valley',
+
+    # Troll maps
     #'TrollApocalypse',
-    #'TrollOverflow',
-    #'TrollBig',
+    'TrollOverflow',
+    'TrollBig',
     #'TrollCheckers',
 ]
 
