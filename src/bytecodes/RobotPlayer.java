@@ -67,6 +67,11 @@ public final strictfp class RobotPlayer {
         Clock.yield();
 
         timePrinting();
+        Clock.yield();
+
+        timeMapLocationMethods(rc);
+        time2DArrayOptions();
+        Clock.yield();
     }
 
     @SuppressWarnings("unused")
@@ -1226,4 +1231,383 @@ public final strictfp class RobotPlayer {
         actual = after - before;
         assertEquals(expected, actual);
     }
+
+    public static void timeMapLocationMethods(RobotController rc) {
+        // this doesn't test everything, just a few interesting ones.
+        // result: each call differs by just a few bytecodes, so initialize maplocations based on what's available to
+        // you.
+        int before, after;
+        int expected, actual;
+
+        before = Clock.getBytecodeNum();
+        MapLocation a = new MapLocation(0, 0);
+        after = Clock.getBytecodeNum();
+        expected = 6;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        MapLocation b = rc.getLocation();
+        after = Clock.getBytecodeNum();
+        expected = 4;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        MapLocation c = new MapLocation(0, 0);
+        before = Clock.getBytecodeNum();
+        MapLocation d = c.translate(30, 30);
+        after = Clock.getBytecodeNum();
+        expected = 7;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        MapLocation e = c.add(Direction.EAST);
+        after = Clock.getBytecodeNum();
+        expected = 6;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        MapLocation f = c.add(Direction.EAST);
+        after = Clock.getBytecodeNum();
+        expected = 6;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        MapLocation g = c.add(Direction.CENTER);
+        after = Clock.getBytecodeNum();
+        expected = 6;
+        actual = after - before;
+        assertEquals(expected, actual);
+    }
+
+    private static int idx(int x, int y, int height) {
+        return x * height + y;
+    }
+
+    private static class Mat3x3 {
+        int m00, m01, m02, m10, m11, m12, m20, m21, m22;
+
+        public int get(int x, int y) {
+            switch (x) {
+                case 0:
+                    switch (y) {
+                        case 0:
+                            return m00;
+                        case 1:
+                            return m01;
+                        case 2:
+                            return m02;
+                    }
+                case 1:
+                    switch (y) {
+                        case 0:
+                            return m10;
+                        case 1:
+                            return m11;
+                        case 2:
+                            return m12;
+                    }
+                case 2:
+                    switch (y) {
+                        case 0:
+                            return m20;
+                        case 1:
+                            return m21;
+                        case 2:
+                            return m22;
+                    }
+            }
+            return -1;
+        }
+    }
+
+    private static class Mat4x4 {
+        int m00, m01, m02, m03, m10, m11, m12, m13, m20, m21, m22, m23, m30, m31, m32, m33;
+
+        public int get(int x, int y) {
+            switch (x) {
+                case 0:
+                    switch (y) {
+                        case 0:
+                            return m00;
+                        case 1:
+                            return m01;
+                        case 2:
+                            return m02;
+                        case 3:
+                            return m03;
+                    }
+                case 1:
+                    switch (y) {
+                        case 0:
+                            return m10;
+                        case 1:
+                            return m11;
+                        case 2:
+                            return m12;
+                        case 3:
+                            return m13;
+                    }
+                case 2:
+                    switch (y) {
+                        case 0:
+                            return m20;
+                        case 1:
+                            return m21;
+                        case 2:
+                            return m22;
+                        case 3:
+                            return m23;
+                    }
+                case 3:
+                    switch (y) {
+                        case 0:
+                            return m30;
+                        case 1:
+                            return m31;
+                        case 2:
+                            return m32;
+                        case 3:
+                            return m33;
+                    }
+            }
+            return -1;
+        }
+    }
+
+    private static int makeNotConstant(int x) {
+        return x;
+    }
+
+    public static void time2DArrayOptions() {
+        // general observations:
+        // A 2d array is often faster than a badly implemented 1d array. However, for certain operations, a 1d array
+        // still wins. And if your size and width are known in advance, and all your memory access have constant
+        // array indices, then just declaring a bunch of local variables might be the best option of all.
+        // If you can pack a small datatype into a big one (e.g. 64 bools into a long), you can save bytecodes during
+        // initialization. However, it will probably cost you more bytecodes on each lookup, so only use this
+        // strategy for sparse data.
+
+        int before, after;
+        int expected, actual;
+
+        final int WIDTH = 3, HEIGHT = 3;
+        // by returning x and y from a function, we trick the compiler into thinking they are not constant.
+        final int x = makeNotConstant(1), y = makeNotConstant(2);
+
+        before = Clock.getBytecodeNum();
+        int[][] plain2d = new int[WIDTH][HEIGHT];
+        after = Clock.getBytecodeNum();
+        expected = 13;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int plain2dAccessed = plain2d[x][y];
+        after = Clock.getBytecodeNum();
+        expected = 7;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int[] packed1d = new int[WIDTH * HEIGHT];
+        after = Clock.getBytecodeNum();
+        expected = 12;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        // just to check that x and y are really being treated as variables
+        before = Clock.getBytecodeNum();
+        final int constantExpression = 1 * 3 + 2;
+        after = Clock.getBytecodeNum();
+        expected = 3;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        final int variableExpression = x * HEIGHT + y;
+        after = Clock.getBytecodeNum();
+        expected = 7;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int packed1dAccessedMult = packed1d[x * HEIGHT + y];
+        after = Clock.getBytecodeNum();
+        expected = 9;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int packed1dAccessedMethod = packed1d[idx(x, y, HEIGHT)];
+        after = Clock.getBytecodeNum();
+        expected = 13;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        Mat3x3 localVars = new Mat3x3();
+        after = Clock.getBytecodeNum();
+        expected = 9;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int localVarsAccessed = localVars.get(x, y);
+        after = Clock.getBytecodeNum();
+        expected = 12;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int localVarsAccessedConstant = localVars.m12;
+        after = Clock.getBytecodeNum();
+        expected = 4;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum2d = 0;
+        for (int i = WIDTH; --i >= 0; ) {
+            for (int j = HEIGHT; --j >= 0; ) {
+                sum2d += plain2d[i][j];
+            }
+        }
+        after = Clock.getBytecodeNum();
+        expected = 143;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum2d_local = 0;
+        int[] col;
+        for (int i = WIDTH; --i >= 0; ) {
+            col = plain2d[i];
+            for (int j = HEIGHT; --j >= 0; ) {
+                sum2d_local += col[j];
+            }
+        }
+        after = Clock.getBytecodeNum();
+        expected = 137;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum1d = 0;
+        for (int i = WIDTH; --i >= 0; ) {
+            for (int j = HEIGHT; --j >= 0; ) {
+                sum1d += packed1d[i * HEIGHT + j];
+            }
+        }
+        after = Clock.getBytecodeNum();
+        expected = 161;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum1d_local = 0;
+        for (int i = WIDTH; --i >= 0; ) {
+            int offset = i * HEIGHT;
+            for (int j = HEIGHT; --j >= 0; ) {
+                sum1d_local += packed1d[offset + j];
+            }
+        }
+        after = Clock.getBytecodeNum();
+        expected = 155;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum1d_blit = 0;
+        for (int i = WIDTH * HEIGHT; --i >= 0; ) {
+            sum1d_blit += packed1d[i];
+        }
+        after = Clock.getBytecodeNum();
+        expected = 98;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum_object = 0;
+        for (int i = WIDTH; --i >= 0; ) {
+            for (int j = HEIGHT; --j >= 0; ) {
+                sum_object += localVars.get(i, j);
+            }
+        }
+        after = Clock.getBytecodeNum();
+        expected = 188;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int sum_object_hardcoded = localVars.m00 + localVars.m01 + localVars.m02
+                + localVars.m10 + localVars.m11 + localVars.m12
+                + localVars.m20 + localVars.m21 + localVars.m22;
+        after = Clock.getBytecodeNum();
+        expected = 28;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int[] packed1dBig = new int[4 * 4];
+        after = Clock.getBytecodeNum();
+        expected = 19;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int packed1dBigAccessedMult = packed1dBig[x * 4 + y];
+        after = Clock.getBytecodeNum();
+        expected = 9;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int packed1dBigAccessedMethod = packed1dBig[idx(x, y, 4)];
+        after = Clock.getBytecodeNum();
+        expected = 13;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        Mat4x4 localVarsBig = new Mat4x4();
+        after = Clock.getBytecodeNum();
+        expected = 9; // same cost as Mat3x3!
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int localVarsBigAccessed = localVarsBig.get(x, y);
+        after = Clock.getBytecodeNum();
+        expected = 12;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        int localVarsBigAccessedConstant = localVarsBig.m12;
+        after = Clock.getBytecodeNum();
+        expected = 4;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        long[] packedDense1dBig = new long[2 * 4];
+        after = Clock.getBytecodeNum();
+        expected = 11;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+        before = Clock.getBytecodeNum();
+        long packedDense1dBigAccessedMult = packedDense1dBig[x * 2 + (y >> 1)];
+        // this actually gives us two blocks. in reality, we would then sometimes need to shift the result by 32 bits
+        after = Clock.getBytecodeNum();
+        expected = 11;
+        actual = after - before;
+        assertEquals(expected, actual);
+
+    }
+
 }
