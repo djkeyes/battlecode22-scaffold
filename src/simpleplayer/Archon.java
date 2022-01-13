@@ -8,6 +8,28 @@ public class Archon {
 
     private static int[] unitCounts;
 
+    private static int soldierThreshold;
+    private static int minerTileMantained;
+
+    static {
+        String param = us == Team.A ? System.getProperty("bc.testing.team-a-param") : System.getProperty("bc.testing.team-b-param");
+        String soldierThresholdProp = null;
+        String minerTileMantainedProp = null;
+        if (param != null && param.length() > 0) {
+            String[] tokens = param.split(",");
+            soldierThresholdProp = tokens[0];
+            minerTileMantainedProp = tokens[1];
+        }
+        soldierThreshold = 20;
+        if (soldierThresholdProp != null) {
+            soldierThreshold = Integer.parseInt(soldierThresholdProp);
+        }
+        minerTileMantained = 10;
+        if (minerTileMantainedProp != null) {
+            minerTileMantained = Integer.parseInt(minerTileMantainedProp);
+        }
+    }
+
     public static void runArchon() throws GameActionException {
 
         Communication.clearUnitCounts();
@@ -74,8 +96,9 @@ public class Archon {
             int numWorkers = (int) (timeToMine / 40. * 9);
             effectiveNumNearbyLeadWorkersNeeded += numWorkers;
         }
+
         // estimate of the number of tiles a single worker can manage. tunable.
-        final int TILES_MANTAINED_BY_WORKER_PER_TURN = 10;
+        final int TILES_MANTAINED_BY_WORKER_PER_TURN = minerTileMantained;
         effectiveNumNearbyLeadWorkersNeeded += (numNearbyLead + TILES_MANTAINED_BY_WORKER_PER_TURN - 1) / TILES_MANTAINED_BY_WORKER_PER_TURN;
 
         if (effectiveNumNearbyLeadWorkersNeeded > numNearbyMiners) {
@@ -101,7 +124,7 @@ public class Archon {
                     }
                 }
             } else {
-                if (unitCounts[RobotType.SOLDIER.ordinal()] < 20) {
+                if (unitCounts[RobotType.SOLDIER.ordinal()] < soldierThreshold) {
                     // build soldiers
                     if (RobotType.SOLDIER.buildCostLead <= ourLead) {
                         for (final Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
