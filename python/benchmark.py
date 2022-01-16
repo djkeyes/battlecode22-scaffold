@@ -143,6 +143,7 @@ def clear_scratch():
 def checkout_benchmarks():
     # flatten and checkout
     flattened_benchmarks = []
+    already_copied = set()
     for benchmark in reference_benchmarks:
         orig_package, commit_identifier, params = benchmark
 
@@ -151,20 +152,23 @@ def checkout_benchmarks():
         generated_package = f'{benchmark_prefix}_{orig_package}_{commit_identifier}'
         generated_package_path = os.path.join(checkout_dir, generated_package)
 
-        subprocess.run(['git', f'--work-tree={checkout_dir}', 'checkout', commit_identifier, '--', package_path])
-        shutil.move(os.path.join(checkout_dir, package_path), generated_package_path)
-        # for each file, pipe it to sed to replace the package name, then write it to a new directory
-        for filename in os.listdir(generated_package_path):
-            full_filename = os.path.join(generated_package_path, filename)
-            pipe = subprocess.Popen(['cat', full_filename], stdout=subprocess.PIPE)
-            pipe.wait()
-            with open(full_filename, 'w') as f:
-                # TODO(daniel): this could probably be done with shutil, which would help to make this script run on windows
-                package_regex = 's/package ' + orig_package + '/package ' + generated_package + '/'
-                static_import_regex = 's/import static ' + orig_package + '/import static ' + generated_package + '/'
-                command = ['sed', '-r', '; '.join([package_regex, static_import_regex])]
-                sed = subprocess.Popen(command, stdin=pipe.stdout, stdout=f)
+        if generated_package not in already_copied:
+            already_copied.add(generated_package)
+
+            subprocess.run(['git', f'--work-tree={checkout_dir}', 'checkout', commit_identifier, '--', package_path])
+            shutil.move(os.path.join(checkout_dir, package_path), generated_package_path)
+            # for each file, pipe it to sed to replace the package name, then write it to a new directory
+            for filename in os.listdir(generated_package_path):
+                full_filename = os.path.join(generated_package_path, filename)
+                pipe = subprocess.Popen(['cat', full_filename], stdout=subprocess.PIPE)
                 pipe.wait()
+                with open(full_filename, 'w') as f:
+                    # TODO(daniel): this could probably be done with shutil, which would help to make this script run on windows
+                    package_regex = 's/package ' + orig_package + '/package ' + generated_package + '/'
+                    static_import_regex = 's/import static ' + orig_package + '/import static ' + generated_package + '/'
+                    command = ['sed', '-r', '; '.join([package_regex, static_import_regex])]
+                    sed = subprocess.Popen(command, stdin=pipe.stdout, stdout=f)
+                    pipe.wait()
 
         flattened_benchmarks.append((generated_package, params))
     return flattened_benchmarks
