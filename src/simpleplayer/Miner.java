@@ -2,6 +2,8 @@ package simpleplayer;
 
 import battlecode.common.*;
 
+import static simpleplayer.Debug.tic;
+import static simpleplayer.Debug.toc;
 import static simpleplayer.RobotPlayer.*;
 
 public class Miner {
@@ -19,17 +21,17 @@ public class Miner {
     private static MapLocation[] nearbyLead;
     private static MapLocation[] nearbyGold;
 
+    private static int elapsed1, elapsed2, elapsed3, elapsed4, elapsed5;
+
     private static int assignResources() throws GameActionException {
+        int start1 = tic();
 
         if (resourcesAvailable == null) {
-            //minerAssignments = new int[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
             resourcesAvailable = new long[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
             minersToConsider = new RobotInfo[25];
-        } else {
-            // Surprisingly, reallocating is cheaper than Arrays.fill or System.arraycopy. So that's dumb.
-            //minerAssignments = new int[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
-            //resourcesAvailable = new long[DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT][DIAMETER_TO_CONSIDER_FOR_ASSIGNMENT];
         }
+
+        elapsed1 = toc(start1, "assignResources-alloc-array", elapsed1);
 
         // assign nearby resources to nearby miners, in order to encourage miners to stay in place once they've found a
         // good spot.
@@ -42,37 +44,161 @@ public class Miner {
         // Also, if there's a tile with a lot of resources (more than RESOURCE_ALLOCATION_PER_TILE), we can assign
         // multiple miners to it, up to amount/RESOURCE_ALLOCATION_PER_TILE.
 
+        int start2 = tic();
         {
             // for dense resource maps, this seems fast for scanning the immediate area
             MapLocation loc = locAtStartOfTurn;
             resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.EAST);
-            resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.NORTH);
-            resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.WEST);
-            resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.WEST);
-            resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.SOUTH);
-            resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.SOUTH);
-            resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.EAST);
-            resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
-            loc = loc.add(Direction.EAST);
-            resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
-                    = rc.onTheMap(loc) ? (rc.senseLead(loc) + rc.senseGold(loc)) : 0;
+                    = rc.senseLead(loc) + rc.senseGold(loc);
+            // enumerate every branch, so we don't have to check rc.onTheMap()
+            if (loc.x == 0) {
+                if (loc.y == 0) {
+                    // only corner
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                } else if (loc.y == rc.getMapHeight() - 1) {
+                    // only corner
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                } else {
+                    // only east edge
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                }
+            } else if (loc.x == rc.getMapWidth() - 1) {
+                if (loc.y == 0) {
+                    // only corner
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                } else if (loc.y == rc.getMapHeight() - 1) {
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                } else {
+                    // only west edge
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                }
+            } else {
+                if (loc.y == 0) {
+                    // only north edge
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                } else if (loc.y == rc.getMapHeight() - 1) {
+                    // only south edge
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                } else {
+                    // all
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.NORTH);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.WEST);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.SOUTH);
+                    resourcesAvailable[-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                    loc = loc.add(Direction.EAST);
+                    resourcesAvailable[1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT][-1 + RADIUS_TO_CONSIDER_FOR_ASSIGNMENT]
+                            = rc.senseLead(loc) + rc.senseGold(loc);
+                }
+            }
         }
+        elapsed2 = toc(start2, "assignResources-scan-resources", elapsed2);
 
+        int start3 = tic();
         RobotInfo[] nearbyRobots = rc.senseNearbyRobots(8, us);
         int numMiners = 0;
         for (int i = nearbyRobots.length; --i >= 0; ) {
@@ -82,7 +208,9 @@ public class Miner {
             }
         }
         minersToConsider[numMiners] = null;
+        elapsed3 = toc(start3, "assignResources-scan-nearby", elapsed3);
 
+        int start4 = tic();
         int myX = locAtStartOfTurn.x;
         int myY = locAtStartOfTurn.y;
         final int RESOURCE_ALLOCATION_PER_TILE = 10;
@@ -253,7 +381,9 @@ public class Miner {
                 }
             }
         }
+        elapsed4 = toc(start4, "assignResources-assign", elapsed4);
 
+        int start5 = tic();
         int numTilesAssignedToUs = 0;
         for (int relX = RADIUS_TO_CONSIDER_FOR_ASSIGNMENT - 1; relX <= RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1; ++relX) {
             for (int relY = RADIUS_TO_CONSIDER_FOR_ASSIGNMENT - 1; relY <= RADIUS_TO_CONSIDER_FOR_ASSIGNMENT + 1; ++relY) {
@@ -262,6 +392,7 @@ public class Miner {
                 }
             }
         }
+        elapsed5 = toc(start5, "assignResources-count", elapsed5);
         return numTilesAssignedToUs;
     }
 
@@ -292,9 +423,9 @@ public class Miner {
         nearbyGold = rc.senseNearbyLocationsWithGold(myType.visionRadiusSquared);
 
         // initializes minerAssignments, which can be used to share resources with other miners
-        int start = Debug.tic();
+        int start = tic();
         int numTilesAssignedToUs = assignResources();
-        maxAssignmentBytecodes = Debug.toc(start, "Miner-assignResources", maxAssignmentBytecodes);
+        maxAssignmentBytecodes = toc(start, "Miner-assignResources", maxAssignmentBytecodes);
 
         // now check the ones assigned to us. How many did we get?
 
