@@ -285,12 +285,16 @@ public class Miner {
         return closest;
     }
 
+    private static int maxAssignmentBytecodes = 0;
+
     public static void runMiner() throws GameActionException {
         nearbyLead = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
         nearbyGold = rc.senseNearbyLocationsWithGold(myType.visionRadiusSquared);
 
         // initializes minerAssignments, which can be used to share resources with other miners
+        int start = Debug.tic();
         int numTilesAssignedToUs = assignResources();
+        maxAssignmentBytecodes = Debug.toc(start, "Miner-assignResources", maxAssignmentBytecodes);
 
         // now check the ones assigned to us. How many did we get?
 

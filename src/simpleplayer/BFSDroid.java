@@ -352,7 +352,11 @@ public class BFSDroid extends BFS {
     static Direction d138;
     static int p138;
 
+    private static int maxElapsed = 0;
+
     Direction getBestDir(MapLocation target) throws GameActionException {
+        int before = Debug.tic();
+
         l84 = rc.getLocation();
         l71 = l84.add(Direction.WEST);
         v71 = 1000000;
@@ -559,7 +563,6 @@ public class BFSDroid extends BFS {
         v101 = 1000000;
         d101 = null;
 
-        //int before2 = Clock.getBytecodeNum();
         if (rc.onTheMap(l71)) {
             if (!rc.canSenseRobotAtLocation(l71)) {
                 p71 = 10 + rc.senseRubble(l71);
@@ -1530,8 +1533,7 @@ public class BFSDroid extends BFS {
                 d138 = d126;
             }
         }
-        //int after2 = Clock.getBytecodeNum();
-        //System.out.println("time to perform search: " + (after2 - before2));
+        maxElapsed = Debug.toc(before, "BFSDroid-search", maxElapsed);
 
         int dx = target.x - l84.x;
         int dy = target.y - l84.y;
