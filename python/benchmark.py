@@ -84,7 +84,7 @@ maps = [
     'sandwich',
     'squer',
     'uncomfortable',
-    'uderground',
+    'underground',
     'valley',
 
     # Troll maps
