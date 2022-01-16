@@ -285,7 +285,7 @@ def benchmark_round_robin(flattened_benchmarks):
         print('-------------------------------------------------------------------------------------')
         print()
         map = maps[s]
-        print(f'\t\tROUND ROBIN WIN RATES PER MAP, map name={maps}')
+        print(f'\t\tROUND ROBIN WIN RATES PER MAP, map name={map}')
         print('\t\t\topponent Id')
         print('\t\t', end='')
         for j in range(len(flattened_benchmarks)):
