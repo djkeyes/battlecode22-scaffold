@@ -107,6 +107,8 @@ benchmark_prefix = 'benchmark'
 
 num_procs = 24
 
+WAIT_SECONDS_PER_PROCESS = 1.0
+
 ###########################################
 
 
@@ -227,8 +229,15 @@ def benchmark_round_robin(flattened_benchmarks):
     while len(async_match_commands) > 0:
         (matchup_args, process) = async_match_commands.popleft()
         (i, j, s) = matchup_args
-        # TODO: use the multiprocessing api to do this more consistently
-        process.wait()
+        try:
+            process.wait(WAIT_SECONDS_PER_PROCESS)
+        except:
+            # TODO: use the asyncio api, and handle processes as soon as they finish
+            # Typically, most matches conclude quickly. However, there is a long tail--stalemate games typically take a
+            # long time to conclude. So move it to the end of the queue, and process other things in the meantime.
+            async_match_commands.append((matchup_args, process))
+            progress_bar.update(0)
+            continue
         stdout, stderr = process.communicate()
 
         if len(stderr) > 0:
@@ -339,8 +348,15 @@ def benchmark_latest_bots(latest_bots, flattened_reference_benchmarks):
     while len(async_match_commands) > 0:
         (matchup_args, process) = async_match_commands.popleft()
         (i, j, s, reverse) = matchup_args
-        # TODO: use the multiprocessing api to do this more consistently
-        process.wait()
+        try:
+            process.wait(WAIT_SECONDS_PER_PROCESS)
+        except:
+            # TODO: use the asyncio api, and handle processes as soon as they finish
+            # Typically, most matches conclude quickly. However, there is a long tail--stalemate games typically take a
+            # long time to conclude. So move it to the end of the queue, and process other things in the meantime.
+            async_match_commands.append((matchup_args, process))
+            progress_bar.update(0)
+            continue
         stdout, stderr = process.communicate()
 
         if len(stderr) > 0:
