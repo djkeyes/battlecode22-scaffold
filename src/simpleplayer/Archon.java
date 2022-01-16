@@ -2,33 +2,13 @@ package simpleplayer;
 
 import battlecode.common.*;
 
+import static simpleplayer.DebugProperties.minerTileMantained;
+import static simpleplayer.DebugProperties.soldierThreshold;
 import static simpleplayer.RobotPlayer.*;
 
 public class Archon {
 
     private static int[] unitCounts;
-
-    private static int soldierThreshold;
-    private static int minerTileMantained;
-
-    static {
-        String param = us == Team.A ? System.getProperty("bc.testing.team-a-param") : System.getProperty("bc.testing.team-b-param");
-        String soldierThresholdProp = null;
-        String minerTileMantainedProp = null;
-        if (param != null && param.length() > 0) {
-            String[] tokens = param.split(",");
-            soldierThresholdProp = tokens[0];
-            minerTileMantainedProp = tokens[1];
-        }
-        soldierThreshold = 20;
-        if (soldierThresholdProp != null) {
-            soldierThreshold = Integer.parseInt(soldierThresholdProp);
-        }
-        minerTileMantained = 10;
-        if (minerTileMantainedProp != null) {
-            minerTileMantained = Integer.parseInt(minerTileMantainedProp);
-        }
-    }
 
     public static void runArchon() throws GameActionException {
 
