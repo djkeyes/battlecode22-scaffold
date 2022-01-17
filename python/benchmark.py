@@ -262,6 +262,11 @@ def benchmark_round_robin(flattened_benchmarks):
         num_games[i, j, s] += 1
         num_games[j, i, s] += 1
 
+        process.stdout.close()
+        process.stderr.close()
+        process.__exit__(None, None, None)
+        del process
+
         iteration += 1
         progress_bar.update(1)
 
@@ -379,6 +384,11 @@ def benchmark_latest_bots(latest_bots, flattened_reference_benchmarks):
         if winner == 0:
             num_wins[i, j, s] += 1
         num_games[i, j, s] += 1
+
+        process.stdout.close()
+        process.stderr.close()
+        process.__exit__(None, None, None)
+        del process
 
         iteration += 1
         progress_bar.update(1)
