@@ -2,13 +2,28 @@ package simpleplayer;
 
 import battlecode.common.*;
 
-import static simpleplayer.DebugProperties.minerTileMantained;
-import static simpleplayer.DebugProperties.soldierThreshold;
+import static simpleplayer.DebugProperties.*;
 import static simpleplayer.RobotPlayer.*;
 
 public class Archon {
 
     private static int[] unitCounts;
+
+    public static void initArchon() throws GameActionException {
+        Communication.writeArchonLocation();
+
+        guessSymmetricArchonLocations();
+    }
+
+    private static void guessSymmetricArchonLocations() throws GameActionException {
+        MapLocation loc = rc.getLocation();
+        for (int i = 0; i < 3; ++i) {
+            if (MapSymmetry.isSymmetryPossible[i]) {
+                MapLocation symmetricCoords = MapSymmetry.getSymmetricCoords(loc, i);
+                GridStrategy.instance.setAttackLocation(symmetricCoords);
+            }
+        }
+    }
 
     public static void runArchon() throws GameActionException {
 
@@ -264,6 +279,10 @@ public class Archon {
 
         areWeUnderAttack = numEnemyAttackers > 0;
 
+        if (shouldRush) {
+            areWeUnderAttack = true;
+        }
+
         areWeUnderAttackAndWinning = false;
         areWeUnderAttackAndShouldGiveUp = false;
         if (areWeUnderAttack) {
@@ -274,7 +293,7 @@ public class Archon {
 
 
             if (numFriendlyAttackers >= 2 * numEnemyAttackers) {
-                areWeUnderAttackAndWinning = true;
+                areWeUnderAttackAndWinning = !shouldRush;
             } else {
                 if (numFriendlyAttackers <= 2 && netEnemyDamagePerTurn >= RobotType.SOLDIER.health) {
                     // they can 1-shot soldiers, so probably not worth fighting here.

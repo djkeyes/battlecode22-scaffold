@@ -52,12 +52,13 @@ public strictfp class RobotPlayer {
         myType = rc.getType();
 
         Directions.initRandomDirections(gen);
+        MapSymmetry.init();
 
-        // if more types need custom behavior, consider spliting them into separate files
+        // if more types need custom behavior, consider splitting them into separate files
         try {
             if (myType == RobotType.ARCHON) {
                 locAtStartOfTurn = rc.getLocation();
-                Communication.writeArchonLocation();
+                Archon.initArchon();
             }
         } catch (Exception e) {
             // :(

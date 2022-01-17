@@ -57,6 +57,25 @@ public class Grid5x5Strategy extends GridStrategy {
         scan(gridX, gridY, left, bot, true);
     }
 
+    @Override
+    public void setAttackLocation(MapLocation loc) throws GameActionException {
+        if (!initialized) {
+            init();
+        }
+
+        int gridX = loc.x / BLOCK_SIZE;
+        int gridY = loc.y / BLOCK_SIZE;
+
+        int gridIdx = gridX * rows + gridY;
+        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - gridIdx / BLOCKS_PER_ARRAY_IDX;
+        int commOffset = gridIdx % BLOCKS_PER_ARRAY_IDX;
+
+        int value = rc.readSharedArray(commIdx);
+        // 1 denotes needing an attacker
+        value = value | (1 << (BITS_PER_BLOCK * commOffset + 1));
+        rc.writeSharedArray(commIdx, value);
+    }
+
     private void scan(int gridX, int gridY, int left, int bot, boolean areWeInBLock) throws GameActionException {
         RobotInfo[] allRobotsInBlock = rc.senseNearbyRobots(new MapLocation(left + 2, bot + 2), 18, null);
         int numOurWorkers = 0;

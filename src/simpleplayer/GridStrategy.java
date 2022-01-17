@@ -8,6 +8,7 @@ public abstract class GridStrategy {
         public static GridStrategy instance = new Grid5x5Strategy();
 
         public abstract void updatePerTurn() throws GameActionException;
+        public abstract void setAttackLocation(MapLocation loc) throws GameActionException;
         public abstract MapLocation findClosestMiningLocation() throws GameActionException;
         public abstract MapLocation findClosestAttackLocation() throws GameActionException;
         public abstract void showDebug() throws GameActionException;

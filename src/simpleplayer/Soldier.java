@@ -87,8 +87,8 @@ public class Soldier {
 
     private static boolean tryMoveToInitialEnemyArchonLocations() throws GameActionException {
         if (checkedArchonLocation == null) {
-            // For now, just store our initial position and try to path towards it
-            // TODO: broadcast initial archon data, so we can check all possible locations
+            // Just store our initial position and try to path towards it. This is a fallback in case the broadcasted
+            // symmetric locations didn't work out.
             checkedArchonLocation = new boolean[3];
             for (int i = 0; i < 3; ++i) {
                 if (!MapSymmetry.isSymmetryPossible[i]) {
