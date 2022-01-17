@@ -416,64 +416,39 @@ public class Miner {
         return closest;
     }
 
-    private static int maxAssignmentBytecodes = 0;
+    private static int maxAssignmentBytecodes, maxStayInPlaceBytecodes, maxFindNearestResourceBytecodes, maxActBytecodes;
 
     public static void runMiner() throws GameActionException {
         nearbyLead = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
         nearbyGold = rc.senseNearbyLocationsWithGold(myType.visionRadiusSquared);
 
         // initializes minerAssignments, which can be used to share resources with other miners
-        int start = tic();
+        int start1 = tic();
         int numTilesAssignedToUs = assignResources();
-        maxAssignmentBytecodes = toc(start, "Miner-assignResources", maxAssignmentBytecodes);
+        maxAssignmentBytecodes = toc(start1, "Miner-assignResources", maxAssignmentBytecodes);
 
         // now check the ones assigned to us. How many did we get?
 
         if (numTilesAssignedToUs >= 5) {
+            int start2 = tic();
             // just stay here
             lastTargetMiningLocation = locAtStartOfTurn;
             tryMiningAdjacentTiles();
+            maxStayInPlaceBytecodes = toc(start2, "Miner-stay-in-place", maxStayInPlaceBytecodes);
             return;
         }
-
-        //int before2 = Clock.getBytecodeNum();
 
         // See if there are any farms that can be harvested right now. If there are none, but we have some assigned to
         // us, just hang around our assignments.
 
+        int start3 = tic();
         int myX = locAtStartOfTurn.x;
         int myY = locAtStartOfTurn.y;
-        MapLocation nearestVisibleUnassignedLeadLocation = null;
-        MapLocation secondNearestUnassignedVisibleLeadLocation = null;
-        int closestLeadRadiusSquared = Integer.MAX_VALUE;
-        int secondLeadClosestRadiusSquared = Integer.MAX_VALUE;
-        for (int i = 0; i < nearbyLead.length; ++i) {
-            MapLocation resourceLocation = nearbyLead[i];
-            int dx = resourceLocation.x - myX;
-            int dy = resourceLocation.y - myY;
-            if (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) {
-                // this is already adjacent to us, so don't consider it for the search.
-                continue;
-            }
-            if (rc.senseLead(resourceLocation) < MIN_LEAD_AMOUNT) {
-                continue;
-            }
-            int rSquare = dx * dx + dy * dy;
-            if (rSquare < closestLeadRadiusSquared) {
-                secondLeadClosestRadiusSquared = closestLeadRadiusSquared;
-                secondNearestUnassignedVisibleLeadLocation = nearestVisibleUnassignedLeadLocation;
-                closestLeadRadiusSquared = rSquare;
-                nearestVisibleUnassignedLeadLocation = resourceLocation;
-            } else if (rSquare == closestLeadRadiusSquared) {
-                secondLeadClosestRadiusSquared = rSquare;
-                secondNearestUnassignedVisibleLeadLocation = resourceLocation;
-            }
-        }
-        MapLocation nearestVisibleUnassignedGoldLocation = null;
-        MapLocation secondNearestUnassignedVisibleGoldLocation = null;
-        int closestGoldRadiusSquared = Integer.MAX_VALUE;
-        int secondClosestGoldRadiusSquared = Integer.MAX_VALUE;
-        for (int i = 0; i < nearbyGold.length; ++i) {
+
+        // if there are multiple options, prefer gold, since it's a tiebreaker
+        MapLocation nearestVisibleUnassignedLocation = null;
+        int closestRadiusSquared = Integer.MAX_VALUE;
+        for (int i = nearbyGold.length; --i >= 0; ) {
             MapLocation resourceLocation = nearbyGold[i];
             int dx = resourceLocation.x - myX;
             int dy = resourceLocation.y - myY;
@@ -482,29 +457,46 @@ public class Miner {
                 continue;
             }
             int rSquare = dx * dx + dy * dy;
-            if (rSquare < closestGoldRadiusSquared) {
-                secondClosestGoldRadiusSquared = closestGoldRadiusSquared;
-                secondNearestUnassignedVisibleGoldLocation = nearestVisibleUnassignedGoldLocation;
-                closestGoldRadiusSquared = rSquare;
-                nearestVisibleUnassignedGoldLocation = resourceLocation;
-            } else if (rSquare == closestGoldRadiusSquared) {
-                secondClosestGoldRadiusSquared = rSquare;
-                secondNearestUnassignedVisibleGoldLocation = resourceLocation;
+            if (rSquare < closestRadiusSquared) {
+                closestRadiusSquared = rSquare;
+                nearestVisibleUnassignedLocation = resourceLocation;
+                if (rSquare == 4) {
+                    // this is the minimum, can go ahead and quit now
+                    break;
+                }
             }
         }
 
-        // if there are multiple options, prefer gold, since it's a tiebreaker
-        MapLocation closestResource = nearestVisibleUnassignedGoldLocation;
-        MapLocation secondClosestResource = secondNearestUnassignedVisibleGoldLocation;
-        if (closestResource == null) {
-            closestResource = nearestVisibleUnassignedLeadLocation;
-            secondClosestResource = secondNearestUnassignedVisibleLeadLocation;
-        } else if (secondClosestResource == null) {
-            secondClosestResource = nearestVisibleUnassignedLeadLocation;
+        if (nearestVisibleUnassignedLocation == null) {
+            for (int i = nearbyLead.length; --i >= 0; ) {
+                MapLocation resourceLocation = nearbyLead[i];
+                int dx = resourceLocation.x - myX;
+                int dy = resourceLocation.y - myY;
+                if (dx >= -1 && dx <= 1 && dy >= -1 && dy <= 1) {
+                    // this is already adjacent to us, so don't consider it for the search.
+                    continue;
+                }
+                if (rc.senseLead(resourceLocation) < MIN_LEAD_AMOUNT) {
+                    continue;
+                }
+                int rSquare = dx * dx + dy * dy;
+                if (rSquare < closestRadiusSquared) {
+                    closestRadiusSquared = rSquare;
+                    nearestVisibleUnassignedLocation = resourceLocation;
+                    if (rSquare == 4) {
+                        // this is the minimum, can go ahead and quit now
+                        // Right now, the engine returns lead in sorted order by y-coordinate, so in the worst case
+                        // (every tile has lead), this cuts our runtime by 50%.
+                        break;
+                    }
+                }
+            }
         }
-        //int after2 = Clock.getBytecodeNum();
-        //System.out.println("bcs to find nearest resources: " + (after2 - before2));
+        MapLocation closestResource = nearestVisibleUnassignedLocation;
 
+        maxFindNearestResourceBytecodes = toc(start3, "Miner-find-nearest-resource", maxFindNearestResourceBytecodes);
+
+        int start4 = tic();
         tryMiningAdjacentTiles();
 
         // continue to travel to last target
@@ -516,11 +508,6 @@ public class Miner {
         MapLocation newTargetMiningLocation = null;
         if (closestResource != null && (rc.senseLead(closestResource) > 1 || rc.senseGold(closestResource) > 0)) {
             newTargetMiningLocation = closestResource;
-        }
-        if (newTargetMiningLocation == null && secondClosestResource != null
-                && (rc.senseLead(secondClosestResource) > 1 || rc.senseGold(secondClosestResource) > 0)) {
-            // if we mined out, go somewhere new
-            newTargetMiningLocation = secondClosestResource;
         }
         if (newTargetMiningLocation == null) {
             // try following a fighter, will probably find rubble to loot
@@ -538,6 +525,7 @@ public class Miner {
 
         // maybe new mines opened up
         tryMiningAdjacentTiles();
+        maxActBytecodes = toc(start4, "Miner-act", maxActBytecodes);
 
     }
 
