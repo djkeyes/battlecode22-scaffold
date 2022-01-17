@@ -50,6 +50,10 @@ public class Watchtower {
                 return;
             }
 
+            if (tryMoveToLocationUnderAttack()) {
+                return;
+            }
+
             if (tryMoveToInitialEnemyArchonLocations()) {
                 return;
             }
@@ -82,6 +86,15 @@ public class Watchtower {
             return false;
         }
         pathfinder.move(closest);
+        return true;
+    }
+
+    private static boolean tryMoveToLocationUnderAttack() throws GameActionException {
+        MapLocation underAttackLocation = GridStrategy.instance.findClosestAttackLocation();
+        if (underAttackLocation == null) {
+            return false;
+        }
+        pathfinder.move(underAttackLocation);
         return true;
     }
 
