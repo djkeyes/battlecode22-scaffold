@@ -13,6 +13,9 @@ public class Grid5x5Strategy extends GridStrategy {
 
     public static int MAX_SHARED_ARRAY_IDX_M1 = 63;
 
+    public static int BITS_PER_BLOCK = 2;
+    public static int BLOCKS_PER_ARRAY_IDX = 8;
+
     private int rows, cols;
     private boolean initialized = false;
 
@@ -108,23 +111,23 @@ public class Grid5x5Strategy extends GridStrategy {
         boolean needsAttacker = (numOurAttackers < numTheirAttackers) || (numTheirAttackers == 0 && theyHaveNonAttackers);
 
         int gridIdx = gridX * rows + gridY;
-        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - gridIdx / 4;
-        int commOffset = gridIdx % 4;
+        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - gridIdx / BLOCKS_PER_ARRAY_IDX;
+        int commOffset = gridIdx % BLOCKS_PER_ARRAY_IDX;
 
         int value = rc.readSharedArray(commIdx);
         if (needsWorker) {
             // 0 denotes needing a worker, the default
-            value = value & ~(1 << (2 * commOffset));
+            value = value & ~(1 << (BITS_PER_BLOCK * commOffset));
         } else {
             // 1 denotes sufficient workers
-            value = value | (1 << (2 * commOffset));
+            value = value | (1 << (BITS_PER_BLOCK * commOffset));
         }
         if (needsAttacker) {
             // 1 denotes needing an attacker
-            value = value | (1 << (2 * commOffset + 1));
+            value = value | (1 << (BITS_PER_BLOCK * commOffset + 1));
         } else {
             // 0 denotes sufficient attackers, the default
-            value = value & ~(1 << (2 * commOffset + 1));
+            value = value & ~(1 << (BITS_PER_BLOCK * commOffset + 1));
         }
         rc.writeSharedArray(commIdx, value);
     }
@@ -142,10 +145,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX - 1;
             int y = gridY;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+            boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
             if (needsWorker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -154,10 +157,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX + 1;
             int y = gridY;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+            boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
             if (needsWorker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -166,10 +169,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX;
             int y = gridY - 1;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+            boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
             if (needsWorker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -178,10 +181,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX;
             int y = gridY + 1;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+            boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
             if (needsWorker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -192,10 +195,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX - 1;
                 int y = gridY - 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                 if (needsWorker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -204,10 +207,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX - 1;
                 int y = gridY + 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                 if (needsWorker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -218,10 +221,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX + 1;
                 int y = gridY - 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                 if (needsWorker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -230,10 +233,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX + 1;
                 int y = gridY + 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                 if (needsWorker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -247,10 +250,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY - r;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                        boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                         if (needsWorker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -261,10 +264,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY - r + i;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                        boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                         if (needsWorker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -275,10 +278,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY + r;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                        boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                         if (needsWorker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -289,10 +292,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY + r - i;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
+                        boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
                         if (needsWorker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -317,10 +320,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX - 1;
             int y = gridY;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+            boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
             if (needsAttacker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -329,10 +332,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX + 1;
             int y = gridY;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+            boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
             if (needsAttacker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -341,10 +344,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX;
             int y = gridY - 1;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+            boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
             if (needsAttacker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -353,10 +356,10 @@ public class Grid5x5Strategy extends GridStrategy {
             int x = gridX;
             int y = gridY + 1;
             int idx = x * rows + y;
-            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-            int commOffset = idx % 4;
+            int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+            int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
             int value = rc.readSharedArray(commIdx);
-            boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+            boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
             if (needsAttacker) {
                 return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
             }
@@ -367,10 +370,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX - 1;
                 int y = gridY - 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                 if (needsAttacker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -379,10 +382,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX - 1;
                 int y = gridY + 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                 if (needsAttacker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -393,10 +396,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX + 1;
                 int y = gridY - 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                 if (needsAttacker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -405,10 +408,10 @@ public class Grid5x5Strategy extends GridStrategy {
                 int x = gridX + 1;
                 int y = gridY + 1;
                 int idx = x * rows + y;
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                 if (needsAttacker) {
                     return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                 }
@@ -422,10 +425,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY - r;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                        boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                         if (needsAttacker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -436,10 +439,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY - r + i;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                        boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                         if (needsAttacker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -450,10 +453,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY + r;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                        boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                         if (needsAttacker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -464,10 +467,10 @@ public class Grid5x5Strategy extends GridStrategy {
                     int y = gridY + r - i;
                     if (x >= 0 && y >= 0 && x < cols && y < rows) {
                         int idx = x * rows + y;
-                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                        int commOffset = idx % 4;
+                        int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                        int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                         int value = rc.readSharedArray(commIdx);
-                        boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                        boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                         if (needsAttacker) {
                             return new MapLocation(x * BLOCK_SIZE + BLOCK_SIZE / 2, y * BLOCK_SIZE + BLOCK_SIZE / 2);
                         }
@@ -489,11 +492,12 @@ public class Grid5x5Strategy extends GridStrategy {
         }
         for (int idx = 0, c = 0; c < cols; ++c) {
             for (int r = 0; r < rows; ++r, ++idx) {
-                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / 4;
-                int commOffset = idx % 4;
+                idx = c * rows + r;
+                int commIdx = MAX_SHARED_ARRAY_IDX_M1 - idx / BLOCKS_PER_ARRAY_IDX;
+                int commOffset = idx % BLOCKS_PER_ARRAY_IDX;
                 int value = rc.readSharedArray(commIdx);
-                boolean needsWorker = (((value >> (2 * commOffset)) & 1) == 0);
-                boolean needsAttacker = (((value >> (2 * commOffset + 1)) & 1) > 0);
+                boolean needsWorker = (((value >> (BITS_PER_BLOCK * commOffset)) & 1) == 0);
+                boolean needsAttacker = (((value >> (BITS_PER_BLOCK * commOffset + 1)) & 1) > 0);
                 MapLocation loc1 = new MapLocation(c * BLOCK_SIZE, r * BLOCK_SIZE);
                 MapLocation loc2 = new MapLocation(c * BLOCK_SIZE + 1, r * BLOCK_SIZE);
                 if (needsWorker) {
