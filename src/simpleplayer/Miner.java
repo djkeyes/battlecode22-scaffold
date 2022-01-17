@@ -44,6 +44,28 @@ public class Miner {
         // Also, if there's a tile with a lot of resources (more than RESOURCE_ALLOCATION_PER_TILE), we can assign
         // multiple miners to it, up to amount/RESOURCE_ALLOCATION_PER_TILE.
 
+        int start3 = tic();
+        RobotInfo[] nearbyRobots = rc.senseNearbyRobots(8, us);
+        int numMiners = 0;
+        for (int i = nearbyRobots.length; --i >= 0; ) {
+            if (nearbyRobots[i].type == RobotType.MINER) {
+                minersToConsider[numMiners] = nearbyRobots[i];
+                ++numMiners;
+                if (numMiners > 7) {
+                    // If there more than 7 adjacent miners, 4 or fewer squares will be uncontested, even if all the
+                    // adjacent miners are packed into a corner. Theoretically, the contested squares could each have
+                    // like 50 lead on them, in which case our heuristic says it's still okay to stay, but it's not
+                    // worth the bytecode cost.
+                    // (A positive side effect of this is that it also discourages traffic jams, since miners won't like
+                    // to stand next to a 2x5 wall of miners)
+                    elapsed3 = toc(start3, "assignResources-scan-nearby", elapsed3);
+                    return 0;
+                }
+            }
+        }
+        minersToConsider[numMiners] = null;
+        elapsed3 = toc(start3, "assignResources-scan-nearby", elapsed3);
+
         int start2 = tic();
         {
             // for dense resource maps, this seems fast for scanning the immediate area
@@ -197,18 +219,6 @@ public class Miner {
             }
         }
         elapsed2 = toc(start2, "assignResources-scan-resources", elapsed2);
-
-        int start3 = tic();
-        RobotInfo[] nearbyRobots = rc.senseNearbyRobots(8, us);
-        int numMiners = 0;
-        for (int i = nearbyRobots.length; --i >= 0; ) {
-            if (nearbyRobots[i].type == RobotType.MINER) {
-                minersToConsider[numMiners] = nearbyRobots[i];
-                ++numMiners;
-            }
-        }
-        minersToConsider[numMiners] = null;
-        elapsed3 = toc(start3, "assignResources-scan-nearby", elapsed3);
 
         int start4 = tic();
         int myX = locAtStartOfTurn.x;
