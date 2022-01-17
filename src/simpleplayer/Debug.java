@@ -5,6 +5,7 @@ import battlecode.common.Clock;
 public class Debug {
 
     public static final boolean SHOULD_LOG_BYTECODES = false;
+    public static final boolean SHOULD_SHOW_VISUALIZATIONS = false;
 
     /**
      * Gets the current bytecode count. Designed to be used with toc.

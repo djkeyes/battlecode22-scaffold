@@ -81,6 +81,14 @@ public class Archon {
         final int TILES_MANTAINED_BY_WORKER_PER_TURN = minerTileMantained;
         effectiveNumNearbyLeadWorkersNeeded += (numNearbyLead + TILES_MANTAINED_BY_WORKER_PER_TURN - 1) / TILES_MANTAINED_BY_WORKER_PER_TURN;
 
+        if (effectiveNumNearbyLeadWorkersNeeded <= numNearbyMiners) {
+            // too many workers. But maybe some land is unexplored, so it's worthwhile tomake more
+            MapLocation loc = GridStrategy.instance.findClosestMiningLocation();
+            if (loc != null && loc.distanceSquaredTo(locAtStartOfTurn) < 10 * 10) {
+                effectiveNumNearbyLeadWorkersNeeded = numNearbyMiners + 1;
+            }
+        }
+
         if (effectiveNumNearbyLeadWorkersNeeded > numNearbyMiners) {
             // build workers
             if (RobotType.MINER.buildCostLead <= ourLead) {

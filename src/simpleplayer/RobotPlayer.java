@@ -69,8 +69,7 @@ public strictfp class RobotPlayer {
         while (true) {
             try {
                 while (true) {
-                    locAtStartOfTurn = rc.getLocation();
-                    locAfterMovement = rc.getLocation();
+                    locAfterMovement = locAtStartOfTurn = rc.getLocation();
                     robotCount = rc.getRobotCount();
                     archonCount = rc.getArchonCount();
                     ourLead = rc.getTeamLeadAmount(us);
@@ -86,6 +85,10 @@ public strictfp class RobotPlayer {
                     reportEnemyArchons();
 
                     pathfinder.initTurn();
+                    GridStrategy.instance.updatePerTurn();
+                    if (myType == RobotType.ARCHON) {
+                        GridStrategy.instance.showDebug();
+                    }
 
                     switch (myType) {
                         case ARCHON:

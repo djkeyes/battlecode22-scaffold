@@ -517,6 +517,10 @@ public class Miner {
             lastTargetMiningLocation = newTargetMiningLocation;
         }
         if (lastTargetMiningLocation == null) {
+            // See if there's anywhere to explore
+            lastTargetMiningLocation = GridStrategy.instance.findClosestMiningLocation();
+        }
+        if (lastTargetMiningLocation == null) {
             // If we just reset, and we don't have an override, pick somewhere at random and move towards it
             lastTargetMiningLocation = new MapLocation(gen.nextInt(rc.getMapWidth()), gen.nextInt(rc.getMapHeight()));
         }
