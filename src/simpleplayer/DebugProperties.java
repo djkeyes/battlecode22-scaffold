@@ -10,7 +10,7 @@ public class DebugProperties {
 
     public static int soldierThreshold = 50;
     public static int minerTileMantained = 10;
-    public static boolean shouldRush = true;
+    public static boolean shouldRush = false;
 
     static {
         if (LOCAL_TESTING_ENABLED) {
