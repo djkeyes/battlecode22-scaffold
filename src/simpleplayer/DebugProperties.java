@@ -6,7 +6,7 @@ import static simpleplayer.RobotPlayer.us;
 
 public class DebugProperties {
 
-    public static boolean LOCAL_TESTING_ENABLED = true;
+    public static boolean LOCAL_TESTING_ENABLED = false;
 
     public static int soldierThreshold = 20;
     public static int minerTileMantained = 10;
