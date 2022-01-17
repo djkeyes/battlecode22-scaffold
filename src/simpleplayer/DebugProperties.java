@@ -8,7 +8,7 @@ public class DebugProperties {
 
     public static boolean LOCAL_TESTING_ENABLED = false;
 
-    public static int soldierThreshold = 20;
+    public static int soldierThreshold = 50;
     public static int minerTileMantained = 10;
 
     static {
