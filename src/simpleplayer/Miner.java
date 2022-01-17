@@ -422,6 +422,13 @@ public class Miner {
         nearbyLead = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
         nearbyGold = rc.senseNearbyLocationsWithGold(myType.visionRadiusSquared);
 
+        if (inRangeOfNearestEnemyAttacker()) {
+            tryMiningAdjacentTiles();
+            fleeNearestAttacker();
+            tryMiningAdjacentTiles();
+            return;
+        }
+
         // initializes minerAssignments, which can be used to share resources with other miners
         int start1 = tic();
         int numTilesAssignedToUs = assignResources();
@@ -531,6 +538,81 @@ public class Miner {
         tryMiningAdjacentTiles();
         maxActBytecodes = toc(start4, "Miner-act", maxActBytecodes);
 
+    }
+
+    private static RobotInfo nearestAttacker = null;
+
+    private static boolean inRangeOfNearestEnemyAttacker() {
+        nearestAttacker = null;
+        int closestDistSq = Integer.MAX_VALUE;
+        for (int i = visibleEnemies.length; --i >= 0; ) {
+            RobotInfo enemy = visibleEnemies[i];
+            if (!enemy.type.canAttack()) {
+                continue;
+            }
+            MapLocation loc = enemy.location;
+            int distSq = loc.distanceSquaredTo(locAtStartOfTurn);
+            // no need to check enemy.type.actionRadiusSquared. See note about ranges in fleeNearestAttacker()
+            if (distSq < closestDistSq) {
+                closestDistSq = distSq;
+                nearestAttacker = enemy;
+            }
+        }
+        return nearestAttacker != null;
+    }
+
+    private static void fleeNearestAttacker() throws GameActionException {
+        if (!rc.isMovementReady()) {
+            return;
+        }
+        // TODO: do some fancy pathfinding here
+        // We want to find the tile that gets us away from the enemy the fastest. If we only look 1 turn ahead, then we
+        // only need to take into account the distance to the enemy. If we look 2 turns ahead, we need to take into
+        // account the distance to the enemy, AND the cost of the tile we land on.
+        // For now, we'll score positions ranked by the following tiebreakers:
+        // 1. does it get us out of attack range? (TODO: consider the range+1, since soldiers can shoot after moving)
+        // 2. if tied, does it get us further away in max abs distance? (since units can move along diagonals)
+        // 3. if tied, does it have the least rubble?
+
+        MapLocation nearestAttackerLoc = nearestAttacker.location;
+        // For watchtowers and sages, their action radius really is 20, the same as the miner vision radius
+        // For soldiers, they can shoot after moving, which means their effective action radius is 25, which is longer
+        // than we can even see!
+        int attackerRange = RobotType.MINER.visionRadiusSquared;
+
+        boolean bestIsOutOfRange = false;
+        int maxWalkDistance = Integer.MIN_VALUE;
+        int minRubble = Integer.MAX_VALUE;
+        Direction bestDir = null;
+        for (Direction d : Directions.RANDOM_DIRECTION_PERMUTATION) {
+            MapLocation loc = locAtStartOfTurn.add(d);
+            if (!rc.onTheMap(loc)) {
+                continue;
+            }
+            if (rc.canSenseRobotAtLocation(loc)) {
+                continue;
+            }
+            boolean outOfRange = loc.distanceSquaredTo(nearestAttackerLoc) > attackerRange;
+            if (!outOfRange && bestIsOutOfRange) {
+                continue;
+            }
+            int dx = Math.abs(loc.x - nearestAttackerLoc.x);
+            int dy = Math.abs(loc.y - nearestAttackerLoc.y);
+            int walkDist = Math.max(dx, dy);
+            int rubble = rc.senseRubble(loc);
+            if ((outOfRange && !bestIsOutOfRange)
+                    || (walkDist > maxWalkDistance)
+                    || (walkDist == maxWalkDistance && rubble < minRubble)) {
+                bestIsOutOfRange = outOfRange;
+                maxWalkDistance = walkDist;
+                minRubble = rubble;
+                bestDir = d;
+            }
+        }
+        if (bestDir != null) {
+            rc.move(bestDir);
+            locAfterMovement = locAtStartOfTurn.add(bestDir);
+        }
     }
 
     private static void tryMiningAdjacentTiles() throws GameActionException {
