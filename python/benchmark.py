@@ -175,15 +175,19 @@ def checkout_benchmarks():
 
 def copy_latest(latest_bots):
     # just directly copy this--git doesn't know it exists yet.
+    already_copied = set()
     for latest in latest_bots:
         orig_package, params = latest
 
-        package_path = os.path.join(src_dir, orig_package)
+        if orig_package not in already_copied:
+            already_copied.add(orig_package)
 
-        generated_package = f'{benchmark_prefix}_{orig_package}'
-        generated_package_path = os.path.join(checkout_dir, generated_package)
+            package_path = os.path.join(src_dir, orig_package)
 
-        shutil.copytree(package_path, generated_package_path)
+            generated_package = f'{benchmark_prefix}_{orig_package}'
+            generated_package_path = os.path.join(checkout_dir, generated_package)
+
+            shutil.copytree(package_path, generated_package_path)
 
 def build_bots():
     gradle_command = get_gradle_command()
