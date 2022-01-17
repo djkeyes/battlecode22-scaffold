@@ -45,10 +45,16 @@ public class Archon {
                 return;
             }
         } else {
-            // follow normal build order
-            handleNormalBuildOrder();
-            tryHealingNearbyUnits();
-            return;
+            if (anyOtherArchonsNeedMoney && ourLead < (RobotType.SOLDIER.buildCostLead + RobotType.MINER.buildCostLead)) {
+                // let the other archons have the money
+                tryHealingNearbyUnits();
+                return;
+            } else {
+                // follow normal build order
+                handleNormalBuildOrder();
+                tryHealingNearbyUnits();
+                return;
+            }
         }
 
 
@@ -214,6 +220,7 @@ public class Archon {
     private static boolean anyOtherArchonsNeedMoney = false;
 
     private static void checkUnderAttack() throws GameActionException {
+        // TODO: if archons get destroyed, this can be left with stale value. Check the archon count and re-initialize.
         Communication.cacheArchonsUnderAttack();
 
         int numFriendlyAttackers = 0;
@@ -231,6 +238,13 @@ public class Archon {
                 ++numEnemyAttackers;
                 netEnemyDamagePerTurn += enemy.type.getDamage(enemy.level);
             } else if (enemyType == RobotType.ARCHON && rc.getRoundNum() > 2) {
+                ++numEnemyAttackers;
+            }
+        }
+
+        if (numEnemyAttackers == 0) {
+            MapLocation closestUnderAttack = GridStrategy.instance.findClosestAttackLocation();
+            if (closestUnderAttack != null && closestUnderAttack.distanceSquaredTo(locAtStartOfTurn) < 15 * 15) {
                 ++numEnemyAttackers;
             }
         }
@@ -279,6 +293,14 @@ public class Archon {
         } else {
             if (Communication.readArchonUnderAttack(Communication.myArchonIndex) || Communication.readArchonNeedsMoneyForSoldier(Communication.myArchonIndex)) {
                 Communication.writeArchonUnderAttack(false, false);
+            }
+        }
+
+        if (Debug.SHOULD_SHOW_VISUALIZATIONS) {
+            if (areWeUnderAttack && !areWeUnderAttackAndWinning) {
+                rc.setIndicatorDot(locAtStartOfTurn, 0, 0, 0);
+            } else {
+                rc.setIndicatorDot(locAtStartOfTurn, 255, 255, 255);
             }
         }
     }
