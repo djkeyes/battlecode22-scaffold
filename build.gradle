@@ -290,6 +290,7 @@ task runPrecompiled(type: JavaExec) {
     classpath = sourceSets.precompiled.runtimeClasspath
     args = ['-c=-']
     jvmArgs = [
+            '-XX:ReservedCodeCacheSize=512m',
             '-Dbc.server.mode=headless',
             '-Dbc.server.map-path=maps',
             '-Dbc.server.debug=false',
