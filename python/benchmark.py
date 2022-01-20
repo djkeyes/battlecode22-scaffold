@@ -199,6 +199,9 @@ def build_bots():
 
 def get_match_winner(match_out):
     winsIdx = match_out.find(b'wins')
+    if winsIdx == -1:
+        print('Could not find winner! Match output follows:')
+        print(match_out)
     prevNewlineIdx = match_out.rfind(b'\n', 0, winsIdx)
     nextNewlineIdx = match_out.find(b'\n', winsIdx)
     winString = match_out[prevNewlineIdx:nextNewlineIdx].decode('utf-8')
