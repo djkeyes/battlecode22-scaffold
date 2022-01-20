@@ -6,9 +6,15 @@ import static simpleplayer.RobotPlayer.*;
 
 public class Soldier {
 
+    private static MapLocation nearestArchonLocation;
+    private static boolean shouldHeal = false;
+
     public static void runSoldier() throws GameActionException {
         RobotInfo[] nearbyAllies = visibleAllies;
         RobotInfo[] nearbyEnemies = visibleEnemies;
+
+        nearestArchonLocation = findNearestArchonLocation();
+        shouldHeal = (shouldHeal && rc.getHealth() < myType.getMaxHealth(rc.getLevel())) || rc.getHealth() < 18;
 
         // do micro if we're near enemies
         if (nearbyEnemies.length > 0) {
@@ -27,6 +33,10 @@ public class Soldier {
                     }
                 }
             }
+            if (shouldHeal) {
+                moveToFriendlyArchon();
+                return;
+            }
 
             if (tryMoveToClosestKnownEnemyArchonLocation()) {
                 return;
@@ -42,6 +52,27 @@ public class Soldier {
             tryMoveToRandomTarget();
 
         }
+    }
+
+    private static MapLocation findNearestArchonLocation() throws GameActionException {
+        MapLocation[] archonLocations = Communication.readArchonLocations();
+        MapLocation closestArchon = null;
+        int closestDistSq = Integer.MAX_VALUE;
+        for (MapLocation a : archonLocations) {
+            int distSq = a.distanceSquaredTo(locAtStartOfTurn);
+            if (distSq < closestDistSq) {
+                closestDistSq = distSq;
+                closestArchon = a;
+            }
+        }
+        if (closestArchon == null) {
+            return myInitialLocation;
+        }
+        return closestArchon;
+    }
+
+    private static void moveToFriendlyArchon() throws GameActionException {
+        pathfinder.move(nearestArchonLocation);
     }
 
     private static boolean tryMoveToClosestKnownEnemyArchonLocation() throws GameActionException {
@@ -80,7 +111,6 @@ public class Soldier {
         return true;
     }
 
-    private static MapLocation myInitialLocation = null;
     private static boolean[] checkedArchonLocation = null;
     private static MapLocation lastArchonTarget = null;
     private static int curSymmetryInvestigation = -1;
@@ -95,7 +125,6 @@ public class Soldier {
                     checkedArchonLocation[i] = true;
                 }
             }
-            myInitialLocation = locAtStartOfTurn;
         }
 
         if (lastArchonTarget != null && locAtStartOfTurn.distanceSquaredTo(lastArchonTarget) < myType.visionRadiusSquared) {
@@ -192,7 +221,7 @@ public class Soldier {
                 }
             }
 
-            if (rc.getHealth() > highestAtk * 3 && numCanShootThem + 1 >= numCanShootUs) {
+            if (rc.getHealth() > highestAtk * 3 && numCanShootThem + 1 >= numCanShootUs && !shouldHeal) {
                 // attack
                 if (weakestThreat != null) {
                     // pick one that's an immediate threat
@@ -238,26 +267,33 @@ public class Soldier {
                 if (rc.isActionReady()) {
                     rc.attack(weakest.location);
                 }
+                if (shouldHeal && rc.isMovementReady()) {
+                    moveToFriendlyArchon();
+                }
                 return;
             } else {
                 // path toward the weakest person nearby
                 if (rc.isMovementReady()) {
-                    weakest = getWeakest(nearbyEnemies);
-                    MapLocation weakestLoc = null;
-                    if (weakest != null) {
-                        weakestLoc = weakest.location;
-                    }
-                    if (weakestLoc != null) {
-                        if (nearbyAllies.length > nearbyEnemies.length) {
-                            // lots of allies, be aggressive
-                            pathfinder.move(weakestLoc);
-                        } else {
-                            // few allies, be careful
-                            // TODO: in this situation, be cautious
-                            pathfinder.move(weakestLoc);
+                    if (shouldHeal) {
+                        moveToFriendlyArchon();
+                    } else {
+                        weakest = getWeakest(nearbyEnemies);
+                        MapLocation weakestLoc = null;
+                        if (weakest != null) {
+                            weakestLoc = weakest.location;
                         }
-                        if (rc.isActionReady() && locAfterMovement.distanceSquaredTo(weakestLoc) < myType.actionRadiusSquared) {
-                            rc.attack(weakest.location);
+                        if (weakestLoc != null) {
+                            if (nearbyAllies.length > nearbyEnemies.length) {
+                                // lots of allies, be aggressive
+                                pathfinder.move(weakestLoc);
+                            } else {
+                                // few allies, be careful
+                                // TODO: in this situation, be cautious
+                                pathfinder.move(weakestLoc);
+                            }
+                            if (rc.isActionReady() && locAfterMovement.distanceSquaredTo(weakestLoc) < myType.actionRadiusSquared) {
+                                rc.attack(weakest.location);
+                            }
                         }
                     }
                 }

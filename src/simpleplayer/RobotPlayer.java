@@ -13,6 +13,7 @@ public strictfp class RobotPlayer {
     public static Team them;
     public static Random gen;
     public static RobotType myType;
+    public static MapLocation myInitialLocation;
     // changes per-turn
     public static MapLocation locAtStartOfTurn;
     public static int robotCount;
@@ -50,6 +51,7 @@ public strictfp class RobotPlayer {
         them = us.opponent();
         gen = new Random(id * 131071L + randomSeed);
         myType = rc.getType();
+        myInitialLocation = rc.getLocation();
 
         Directions.initRandomDirections(gen);
         MapSymmetry.init();
