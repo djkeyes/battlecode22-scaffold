@@ -222,7 +222,7 @@ def benchmark_round_robin(flattened_benchmarks):
     matchups = list(itertools.permutations(range(len(flattened_benchmarks)), r=2))
     total_iterations = len(matchups) * len(maps) * runs_per_matchup
     print(f'running matches ({total_iterations} matches total)...')
-    progress_bar = tqdm.tqdm(total=total_iterations)
+    progress_bar = tqdm.tqdm(total=total_iterations, smoothing=0.01)
     progress_bar.update(iteration)
     match_commands = deque()
     for i, j in matchups:
