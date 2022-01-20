@@ -179,6 +179,8 @@ public class Soldier {
         double minThreatHealth = Double.MAX_VALUE;
         double highestAtk = 0;
         MapLocation weakestThreat = null;
+        double theirDamagePerTurn = 0;
+        double theirBurstDamage = 0;
         for (RobotInfo enemy : nearbyEnemies) {
             if (enemy.type == RobotType.ARCHON || enemy.type == RobotType.LABORATORY || enemy.type == RobotType.MINER || enemy.type == RobotType.BUILDER) {
                 continue;
@@ -186,6 +188,9 @@ public class Soldier {
             int distSq = enemy.location.distanceSquaredTo(curLoc);
             if (distSq <= enemy.type.actionRadiusSquared) {
                 numCanShootUs++;
+                double enemyDamage = enemy.type.getDamage(enemy.level);
+                theirBurstDamage += enemyDamage;
+                theirDamagePerTurn += enemyDamage / (1.0 + 0.1 * rc.senseRubble(enemy.location));
 
                 highestAtk = Math.max(highestAtk, enemy.type.getDamage(enemy.level));
 
@@ -221,7 +226,12 @@ public class Soldier {
                 }
             }
 
-            if (rc.getHealth() > highestAtk * 3 && numCanShootThem + 1 >= numCanShootUs && !shouldHeal) {
+            double ourDamagePerTurn = myType.damage / (1.0 + 0.1 * rc.senseRubble(locAtStartOfTurn));
+            // TODO: compute how much damage we will take if we wait for our movement cooldown to finish, and then how
+            //  much damage we will take if we move to another tile. If adjacent tiles will result in too much damage,
+            //  we should retreat.
+
+            if (rc.getHealth() > theirBurstDamage * 2 && ourDamagePerTurn >= theirDamagePerTurn && numCanShootThem + 1 >= numCanShootUs && !shouldHeal) {
                 // attack
                 if (weakestThreat != null) {
                     // pick one that's an immediate threat
