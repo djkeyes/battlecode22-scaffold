@@ -111,7 +111,7 @@ benchmark_prefix = 'benchmark'
 # cores or memory than me, you may want to decrease this value.
 num_procs = 16
 
-WAIT_SECONDS_PER_PROCESS = 1.0
+WAIT_SECONDS_PER_PROCESS = 0.5
 
 ###########################################
 
