@@ -41,8 +41,8 @@ maps = [
     '10x10',
     'Gradient',
     'Random',
-    'Checkers2',
     'Checkers',
+    #'Checkers2',
     'SuddenDeath',
 
     # close archon start maps
@@ -66,9 +66,9 @@ maps = [
     'Desert',
 
     # gimicky maps
-    'AllRubble',
-    'XenosArrow',
-    'HardToPathfind',
+    #'AllRubble',
+    #'XenosArrow',
+    #'HardToPathfind',
 
     # Official maps
     'maptestsmall',
