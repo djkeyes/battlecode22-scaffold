@@ -105,7 +105,10 @@ runs_per_matchup = 2 # 100 or so would be better
 
 benchmark_prefix = 'benchmark'
 
-num_procs = 24
+# My system has 16 cores and 64GB memory
+# In the worst case, each game takes almost 3GB of memory. If you have less 
+# cores or memory than me, you may want to decrease this value.
+num_procs = 16
 
 WAIT_SECONDS_PER_PROCESS = 1.0
 
