@@ -328,9 +328,9 @@ public class Soldier {
         int curRubble = rc.senseRubble(locAtStartOfTurn);
 
         MapLocation leftLoc = locAtStartOfTurn.add(left);
-        int leftRubble = rc.canSenseLocation(leftLoc) ? rc.senseRubble(leftLoc) : 101;
+        int leftRubble = rc.canSenseLocation(leftLoc) && !rc.canSenseRobotAtLocation(leftLoc) ? rc.senseRubble(leftLoc) : 101;
         MapLocation rightLoc = locAtStartOfTurn.add(right);
-        int rightRubble = rc.canSenseLocation(rightLoc) ? rc.senseRubble(rightLoc) : 101;
+        int rightRubble = rc.canSenseLocation(rightLoc) && !rc.canSenseRobotAtLocation(rightLoc) ? rc.senseRubble(rightLoc) : 101;
         if (leftRubble < curRubble || rightRubble < curRubble) {
             if (leftRubble < rightRubble) {
                 rc.move(left);
@@ -342,9 +342,9 @@ public class Soldier {
         }
 
         leftLoc = locAtStartOfTurn.add(backLeft);
-        leftRubble = rc.canSenseLocation(leftLoc) ? rc.senseRubble(leftLoc) : 101;
+        leftRubble = rc.canSenseLocation(leftLoc) && !rc.canSenseRobotAtLocation(leftLoc) ? rc.senseRubble(leftLoc) : 101;
         rightLoc = locAtStartOfTurn.add(backRight);
-        rightRubble = rc.canSenseLocation(rightLoc) ? rc.senseRubble(rightLoc) : 101;
+        rightRubble = rc.canSenseLocation(rightLoc) && !rc.canSenseRobotAtLocation(rightLoc) ? rc.senseRubble(rightLoc) : 101;
         if (leftRubble < curRubble || rightRubble < curRubble) {
             if (leftRubble < rightRubble) {
                 rc.move(backLeft);
@@ -356,7 +356,7 @@ public class Soldier {
         }
 
         MapLocation backLoc = locAtStartOfTurn.add(back);
-        int backRubble = rc.canSenseLocation(backLoc) ? rc.senseRubble(backLoc) : 101;
+        int backRubble = rc.canSenseLocation(backLoc) && !rc.canSenseRobotAtLocation(backLoc) ? rc.senseRubble(backLoc) : 101;
         if (backRubble < curRubble) {
             rc.move(backLeft);
         }
