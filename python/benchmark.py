@@ -11,8 +11,9 @@ import tqdm
 import numpy as np
 
 src_dir = './src/'
-checkout_dir = './benchmarker/scratch/'
-build_dir = checkout_dir + 'build/'
+benchmark_scratch_dir = './benchmarker/scratch/'
+checkout_dir = benchmark_scratch_dir + 'src/'
+build_dir = benchmark_scratch_dir + 'build/'
 
 # benchmarks, in the format (package name, commit hash or branch, debug params)
 # (use a singleton list if no params to try)
@@ -115,29 +116,6 @@ WAIT_SECONDS_PER_PROCESS = 1.0
 ###########################################
 
 
-def get_gradle_command():
-    if platform.system() == 'Windows':
-        return 'gradlew.bat'
-    else:
-        return './gradlew'
-
-def create_match_command(team_a, team_b, param_a, param_b, map_name, seed_a, seed_b):
-    gradle_command = get_gradle_command()
-    param_a = ''.join(param_a)
-    param_b = ''.join(param_b)
-    command = [gradle_command, 'fastrun',
-        '-PteamA=' + team_a,
-        '-PteamB=' + team_b,
-        '-PparamA=' + param_a,
-        '-PparamB=' + param_b,
-        '-Pmaps=' + map_name,
-        '-PseedA=' + str(seed_a),
-        '-PseedB=' + str(seed_b),
-        '-Psource=' + checkout_dir,
-        '-PbuildDir=' + build_dir
-    ]
-    return command
-
 def clear_scratch():
     if os.path.exists(checkout_dir):
         shutil.rmtree(checkout_dir)
@@ -192,10 +170,42 @@ def copy_latest(latest_bots):
 
             shutil.copytree(package_path, generated_package_path)
 
+def get_gradle_command():
+    if platform.system() == 'Windows':
+        return 'gradlew.bat'
+    else:
+        return './gradlew'
+        
 def build_bots():
     gradle_command = get_gradle_command()
-    command = [gradle_command, 'build', '-Psource=' + checkout_dir, '-PbuildDir=' + build_dir]
+    command = [gradle_command,
+        'build',
+        '-Psource=' + checkout_dir,
+        '-PbuildDir=' + build_dir,
+        '-PclassLocation=' + build_dir + 'classes/',
+        '-PsourcePrecompile=' + checkout_dir,
+    ]
     subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+
+def create_match_command(team_a, team_b, param_a, param_b, map_name, seed_a, seed_b):
+    gradle_command = get_gradle_command()
+    param_a = ''.join(param_a)
+    param_b = ''.join(param_b)
+    command = [gradle_command,
+        'runPrecompiled',
+        '-PteamA=' + team_a,
+        '-PteamB=' + team_b,
+        '-PparamA=' + param_a,
+        '-PparamB=' + param_b,
+        '-Pmaps=' + map_name,
+        '-PseedA=' + str(seed_a),
+        '-PseedB=' + str(seed_b),
+        '-Psource=' + checkout_dir,
+        '-PbuildDir=' + build_dir,
+        '-PclassLocation=' + build_dir + 'classes/',
+        '-PsourcePrecompile=' + checkout_dir,
+    ]
+    return command
 
 def get_match_winner(match_out):
     winsIdx = match_out.find(b'wins')

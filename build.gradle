@@ -16,6 +16,12 @@ ext.versions = [
 ]
 
 
+configurations {
+    main
+    test
+    precompiled
+}
+
 // Battlecode updates a lot.
 // We should make sure to check for new dependencies frequently.
 configurations.all {
@@ -43,6 +49,13 @@ sourceSets {
 
         java.outputDir = file("$buildDir/tests")
         //scala.outputDir = file("$buildDir/tests")
+    }
+    
+    precompiled {
+        java.srcDirs = [ project.property('sourcePrecompile') ]
+        resources.srcDirs = [ project.property('sourcePrecompile') ]
+
+        java.outputDir = file("$buildDir/classes")
     }
 }
 
@@ -83,6 +96,7 @@ def clientName = os.startsWith('windows') ? 'battlecode22-client-win' :
 dependencies {
     // The Battlecode engine.
     implementation group: 'org.battlecode', name: 'battlecode22', version: versions.battlecode
+    precompiledImplementation group: 'org.battlecode', name: 'battlecode22', version: versions.battlecode
 
     // The Battlecode client.
     client group: 'org.battlecode', name: clientName, version: versions.battlecode
@@ -268,12 +282,12 @@ task runDebug(type: JavaExec, dependsOn: 'build') {
             '-Dbc.server.save-file=' + project.property('replay')
     ]
 }
-task fastrun(type: JavaExec) {
+task runPrecompiled(type: JavaExec) {
     description 'Runs a match without starting the client and without checking dependencies (be sure to build beforehand).'
     group 'battlecode'
 
     main = 'battlecode.server.Main'
-    classpath = sourceSets.main.runtimeClasspath
+    classpath = sourceSets.precompiled.runtimeClasspath
     args = ['-c=-']
     jvmArgs = [
             '-Dbc.server.mode=headless',
