@@ -268,6 +268,15 @@ public class Soldier {
                 if (rc.isMovementReady()) {
                     retreat(rc, nearbyEnemies);
                 }
+                if (rc.isActionReady()) {
+                    RobotInfo[] newlyAttackableEnemies = rc.senseNearbyRobots(myType.actionRadiusSquared, them);
+                    RobotInfo weakest = getWeakestInRange(locAfterMovement, newlyAttackableEnemies);
+                    if (weakest != null) {
+                        if (rc.isActionReady()) {
+                            rc.attack(weakest.location);
+                        }
+                    }
+                }
                 return;
             }
         } else {
@@ -286,6 +295,15 @@ public class Soldier {
                 if (rc.isMovementReady()) {
                     if (shouldHeal) {
                         moveToFriendlyArchon();
+                        if (rc.isActionReady()) {
+                            RobotInfo[] newlyAttackableEnemies = rc.senseNearbyRobots(myType.actionRadiusSquared, them);
+                            weakest = getWeakestInRange(locAfterMovement, newlyAttackableEnemies);
+                            if (weakest != null) {
+                                if (rc.isActionReady()) {
+                                    rc.attack(weakest.location);
+                                }
+                            }
+                        }
                     } else {
                         weakest = getWeakest(nearbyEnemies);
                         MapLocation weakestLoc = null;
@@ -301,8 +319,14 @@ public class Soldier {
                                 // TODO: in this situation, be cautious
                                 pathfinder.move(weakestLoc);
                             }
-                            if (rc.isActionReady() && locAfterMovement.distanceSquaredTo(weakestLoc) < myType.actionRadiusSquared) {
-                                rc.attack(weakest.location);
+                            if (rc.isActionReady()) {
+                                RobotInfo[] newlyAttackableEnemies = rc.senseNearbyRobots(myType.actionRadiusSquared, them);
+                                weakest = getWeakestInRange(locAfterMovement, newlyAttackableEnemies);
+                                if (weakest != null) {
+                                    if (rc.isActionReady()) {
+                                        rc.attack(weakest.location);
+                                    }
+                                }
                             }
                         }
                     }
@@ -358,7 +382,7 @@ public class Soldier {
         MapLocation backLoc = locAtStartOfTurn.add(back);
         int backRubble = rc.canSenseLocation(backLoc) && !rc.canSenseRobotAtLocation(backLoc) ? rc.senseRubble(backLoc) : 101;
         if (backRubble < curRubble) {
-            rc.move(backLeft);
+            rc.move(back);
         }
 
 
