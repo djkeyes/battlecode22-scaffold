@@ -78,10 +78,14 @@ public class Archon {
     private static void handleNormalBuildOrder() throws GameActionException {
 
         int numNearbyMiners = 0;
+        int numSoldiersHealing = 0;
         int effectiveNumNearbyLeadWorkersNeeded = 0;
         for (RobotInfo r : visibleAllies) {
             if (r.type == RobotType.MINER) {
                 ++numNearbyMiners;
+            }
+            if (r.type == RobotType.SOLDIER && r.health < r.type.getMaxHealth(r.level)) {
+                ++numSoldiersHealing;
             }
         }
         MapLocation[] leadLocations = rc.senseNearbyLocationsWithLead(myType.visionRadiusSquared);
@@ -109,6 +113,8 @@ public class Archon {
                 effectiveNumNearbyLeadWorkersNeeded = numNearbyMiners + 1;
             }
         }
+        // soldiers take up some space, so don't build miners if it's too crowded
+        effectiveNumNearbyLeadWorkersNeeded -= numSoldiersHealing / 2;
 
         if (effectiveNumNearbyLeadWorkersNeeded > numNearbyMiners) {
             // build workers
