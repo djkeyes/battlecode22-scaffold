@@ -18,13 +18,18 @@ build_dir = benchmark_scratch_dir + 'build/'
 # benchmarks, in the format (package name, commit hash or branch, debug params)
 # (use a singleton list if no params to try)
 reference_benchmarks = [
-    ('examplefuncsplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
-    ('simpleplayer', 'cc2802ceabebcd97895b5341bc2bc16bba1eab74', ['']),
-    #('simpleplayer', '3371a0920668c285825598d73d18e08c918be5b4', ['']), # revamped worker assignment
-    #('simpleplayer', 'cd72ddb393348003d6dbc00ea73dbf82e8b3aa46', ['']), # fewer builders
-    #('simpleplayer', '1bd87f22d967d0ef31f60a717a44876143127a46', ['']), # new pathfinding
-    #('simpleplayer', '5ce389b2fb4f61fcc60282d2879a1ec5270c89b5', ['']), # tuned for certain cramped maps
-    ('simpleplayer', 'a63d8992d08e87a9e18c1e10e0b3a4f0f4a1b1a7', ['']), # improved combat
+    #('examplefuncsplayer', 'a6f9f20eaedccd8c2b117a8057d3b28f93e8774b', ['']),
+    #('simpleplayer', 'cc2802ceabebcd97895b5341bc2bc16bba1eab74', ['']),
+    #('simpleplayer', '389811bfcbc2533067618478938322521dada32d', ['']), # post-spring update (no builder farms)
+    #('simpleplayer', '8c47f1dc42264954833599a9531d7a48f750600a', ['']), # combat micro adjustments
+    #('simpleplayer', '074bb5e9e59f8acfd40fb44994cb817d84c6d417', ['']), # grid
+    #('simpleplayer', '942c005e4f518f1e6ae3117a4f39812ea5d9a71e', ['']), # miner retreat
+    #('simpleplayer', '03497a1b3768739d4952822e7e792b39326757dc', ['']), # watchtower + miner priorities
+    #('simpleplayer', '16ac701662ce3ff0cc36535f4213564083b611d4', ['']), # soldier rush + initial build order changes
+    #('simpleplayer', '85dfba3d56646bc12865b5c9719571f659aaa3d4', ['']), # just initial build order changes
+     ('simpleplayer', '885ba47402e559bec3d5c09548036ec2dda7dcb9', ['']), # soldier healing
+     ('simpleplayer', '572232486b10015f58ecd754e717325b9b398cd2', ['']), # fix exploration bug
+     ('simpleplayer', '8e32aa578d73810d7a347df1c5bd65fdcc0e6850', ['']), # latest, micro+bugfixes
 ]
 
 latest_bots = [
@@ -108,8 +113,8 @@ maps = [
 
 benchmark_prefix = 'benchmark'
 
-benchmark_historical = False # compare all reference benchmarks
-benchmark_latest = True # compare the latest bots to reference
+benchmark_historical = True # compare all reference benchmarks
+benchmark_latest = False # compare the latest bots to reference
 
 runs_per_matchup = 2 # 100 or so would be better
 
@@ -118,9 +123,9 @@ runs_per_matchup = 2 # 100 or so would be better
 benchmark_prefix = 'benchmark'
 
 # My system has 16 cores and 64GB memory
-# In the worst case, each game takes almost 3GB of memory. If you have less 
+# In the worst case, each game takes almost 4GB of memory. If you have less
 # cores or memory than me, you may want to decrease this value.
-num_procs = 16
+num_procs = 4
 
 WAIT_SECONDS_PER_PROCESS = 0.5
 
